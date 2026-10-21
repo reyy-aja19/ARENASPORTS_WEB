@@ -1,0 +1,95 @@
+<?php
+
+use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\EventController;
+use App\Http\Controllers\ChatbotSettingsController;
+use App\Http\Controllers\MidtransController;
+use App\Http\Middleware\CekLogin;
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', function () { return view('welcome'); })->name('welcome');
+Route::get('/dashboard', function () { return redirect()->route(session('admin_role') === 'user' ? 'user.home' : 'admin.dashboard'); });
+Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
+Route::get('/auth/google/redirect', [AuthController::class, 'redirectToGoogle'])->name('auth.google.redirect');
+Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
+Route::post('/register', [AuthController::class, 'register'])->name('register.submit');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout.perform');
+Route::get('/lapangan/{lapangan}', [UserController::class, 'courtDetail'])->name('courts.detail');
+Route::get('/logout-success', [AdminController::class, 'logoutSuccess'])->name('logout.success');
+Route::post('/payments/midtrans/notification', [MidtransController::class, 'notification'])->name('midtrans.notification');
+
+Route::middleware([CekLogin::class, 'role:user'])->prefix('user')->name('user.')->group(function () {
+    Route::get('/', [UserController::class, 'home'])->name('home');
+    Route::get('/lapangan', [UserController::class, 'courts'])->name('courts');
+    Route::post('/lapangan/{lapangan}/booking', [UserController::class, 'bookingStore'])->name('booking.store');
+    Route::get('/booking', [UserController::class, 'bookings'])->name('bookings');
+    Route::get('/booking/{booking}/tiket', [UserController::class, 'bookingTicket'])->name('bookings.ticket');
+    Route::post('/booking/{booking}/review', [UserController::class, 'reviewStore'])->name('reviews.store');
+    Route::get('/booking/{booking}/midtrans', [MidtransController::class, 'checkout'])->name('midtrans.start');
+    Route::post('/booking/{booking}/midtrans', [MidtransController::class, 'checkout'])->name('midtrans.checkout');
+    Route::get('/pembayaran', [UserController::class, 'payments'])->name('payments');
+    Route::post('/pembayaran/{payment}/bukti', [UserController::class, 'paymentProof'])->name('payments.proof');
+    Route::get('/open-match', [UserController::class, 'openMatches'])->name('openmatches');
+    Route::post('/open-match', [UserController::class, 'openMatchStore'])->name('openmatches.store');
+    Route::post('/open-match/{openMatch}/join', [UserController::class, 'joinMatch'])->name('openmatches.join');
+    Route::get('/tukar-poin', [UserController::class, 'rewards'])->name('rewards');
+    Route::post('/tukar-poin/{reward}', [UserController::class, 'redeem'])->name('rewards.redeem');
+    Route::get('/profil', [UserController::class, 'profile'])->name('profile');
+    Route::put('/profil', [UserController::class, 'profileUpdate'])->name('profile.update');
+});
+
+Route::middleware([CekLogin::class, 'role:superadmin,admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminController::class, 'dashboard'])->name('dashboard');
+    Route::middleware('role:superadmin')->group(function () {
+        Route::get('/control-center', [AdminController::class, 'controlCenter'])->name('control-center');
+    Route::get('/rewards', [AdminController::class, 'rewards'])->name('rewards');
+    Route::post('/rewards', [AdminController::class, 'rewardStore'])->name('rewards.store');
+    Route::get('/rewards/{reward}/edit', [AdminController::class, 'rewardEdit'])->name('rewards.edit');
+    Route::put('/rewards/{reward}', [AdminController::class, 'rewardUpdate'])->name('rewards.update');
+    Route::post('/rewards/{reward}/toggle', [AdminController::class, 'rewardToggle'])->name('rewards.toggle');
+    Route::delete('/rewards/{reward}', [AdminController::class, 'rewardDelete'])->name('rewards.delete');
+        Route::resource('/events', EventController::class)->except(['show'])->names('events');
+        Route::get('/open-match', [AdminController::class, 'openMatches'])->name('openmatches');
+        Route::post('/open-match', [AdminController::class, 'openMatchStore'])->name('openmatches.store');
+        Route::put('/open-match/{openMatch}', [AdminController::class, 'openMatchUpdate'])->name('openmatches.update');
+        Route::post('/open-match/{openMatch}/toggle', [AdminController::class, 'openMatchToggle'])->name('openmatches.toggle');
+        Route::delete('/open-match/{openMatch}', [AdminController::class, 'openMatchDelete'])->name('openmatches.delete');
+        Route::get('/chatbot-settings', [ChatbotSettingsController::class, 'edit'])->name('chatbot.edit');
+        Route::put('/chatbot-settings', [ChatbotSettingsController::class, 'update'])->name('chatbot.update');
+        Route::get('/users', [AdminController::class, 'users'])->name('users');
+        Route::get('/users/create', [AdminController::class, 'userCreate'])->name('users.create');
+        Route::post('/users', [AdminController::class, 'userStore'])->name('users.store');
+        Route::get('/users/{user}/edit', [AdminController::class, 'userEdit'])->name('users.edit');
+        Route::put('/users/{user}', [AdminController::class, 'userUpdate'])->name('users.update');
+        Route::post('/users/{user}/toggle', [AdminController::class, 'userToggle'])->name('users.toggle');
+        Route::delete('/users/{user}', [AdminController::class, 'userDelete'])->name('users.delete');
+    });
+    Route::get('/lapangan', [AdminController::class, 'courts'])->name('courts');
+    Route::get('/lapangan/create', [AdminController::class, 'courtCreate'])->name('courts.create');
+    Route::post('/lapangan', [AdminController::class, 'courtStore'])->name('courts.store');
+    Route::get('/lapangan/{lapangan}/edit', [AdminController::class, 'courtEdit'])->name('courts.edit');
+    Route::put('/lapangan/{lapangan}', [AdminController::class, 'courtUpdate'])->name('courts.update');
+    Route::delete('/lapangan/{lapangan}', [AdminController::class, 'courtDelete'])->name('courts.delete');
+    Route::get('/booking', [AdminController::class, 'bookings'])->name('bookings');
+    Route::post('/booking', [AdminController::class, 'bookingStore'])->name('bookings.store');
+    Route::post('/booking/{booking}/toggle', [AdminController::class, 'bookingToggle'])->name('bookings.toggle');
+    Route::delete('/booking/{booking}', [AdminController::class, 'bookingDelete'])->name('bookings.delete');
+    Route::get('/reviews', [AdminController::class, 'reviews'])->name('reviews');
+    Route::post('/reviews/{review}/reply', [AdminController::class, 'reviewReply'])->name('reviews.reply');
+    Route::post('/reviews/{review}/toggle', [AdminController::class, 'reviewToggle'])->name('reviews.toggle');
+    Route::delete('/reviews/{review}', [AdminController::class, 'reviewDelete'])->name('reviews.delete');
+    Route::get('/payments', [AdminController::class, 'payments'])->name('payments');
+    Route::post('/payments/{payment}/verify', [AdminController::class, 'paymentVerify'])->name('payments.verify');
+    Route::get('/reports', [AdminController::class, 'reports'])->name('reports');
+    Route::get('/reports/export/csv', [AdminController::class, 'exportReportsCsv'])->name('reports.export.csv');
+    Route::get('/reports/export/excel', [AdminController::class, 'exportReportsExcel'])->name('reports.export.excel');
+    Route::get('/export/csv', [AdminController::class, 'exportReportsCsv'])->name('export.csv');
+    Route::get('/export/excel', [AdminController::class, 'exportReportsExcel'])->name('export.excel');
+    Route::get('/profile', [AdminController::class, 'profile'])->name('profile');
+    Route::post('/profile', [AdminController::class, 'profileUpdate'])->name('profile.update');
+    Route::get('/logout', [AdminController::class, 'logoutConfirm'])->name('logout');
+});
