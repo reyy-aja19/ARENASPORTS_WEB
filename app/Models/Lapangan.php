@@ -14,6 +14,7 @@ class Lapangan extends Model
     protected $fillable = [
         'nama',
         'owner_admin_id',
+        'venue_id',
         'jenis',
         'lokasi',
         'latitude',
@@ -33,6 +34,11 @@ class Lapangan extends Model
             'foto_gallery' => 'array',
             'fasilitas' => 'array',
         ];
+    }
+
+    public function venue()
+    {
+        return $this->belongsTo(Venue::class);
     }
 
     public function bookings()

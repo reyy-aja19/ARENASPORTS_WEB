@@ -42,7 +42,22 @@ class User extends Authenticatable
 
     public function isAdmin()
     {
-        return in_array($this->role, ['admin', 'superadmin']);
+        return in_array($this->role, ['admin', 'superadmin', 'venue_admin']);
+    }
+
+    public function venue()
+    {
+        return $this->hasOne(Venue::class, 'owner_admin_id');
+    }
+
+    public function venues()
+    {
+        return $this->hasMany(Venue::class, 'owner_admin_id');
+    }
+
+    public function venueApplications()
+    {
+        return $this->hasMany(VenueApplication::class);
     }
 
     public function bookings()

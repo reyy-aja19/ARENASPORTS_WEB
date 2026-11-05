@@ -21,7 +21,8 @@
         ?? session('admin_role', '');
 
     $isSuperAdmin = $adminRole === 'superadmin';
-    $isAdmin = in_array($adminRole, ['admin', 'superadmin'], true);
+    $isAdmin = in_array($adminRole, ['admin', 'superadmin', 'venue_admin'], true);
+    $isVenueAdmin = $adminRole === 'venue_admin';
 
     $pendingReviewCount = $pendingReviewCount ?? 0;
     $pendingPaymentCount = $pendingPaymentCount ?? 0;
@@ -50,6 +51,8 @@
             </a>
 
             @if($isSuperAdmin)
+                <a class="sidebar-link {{ request()->routeIs('admin.venue-applications*') ? 'active' : '' }}" href="{{ route('admin.venue-applications') }}"><span class="menu-icon"><i class="fa-solid fa-store"></i></span><span class="label">Request Admin Venue</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.venue-withdrawals*') ? 'active' : '' }}" href="{{ route('admin.venue-withdrawals') }}"><span class="menu-icon"><i class="fa-solid fa-money-bill-transfer"></i></span><span class="label">Penarikan Venue</span></a>
                 <a class="sidebar-link {{ request()->routeIs('admin.users*') ? 'active' : '' }}"
                    href="{{ route('admin.users') }}">
                     <span class="menu-icon"><i class="fa-solid fa-circle-user"></i></span>
@@ -57,6 +60,11 @@
                 </a>
             @endif
 
+            @if($isVenueAdmin)
+                <a class="sidebar-link {{ request()->routeIs('user.venue-application*') ? 'active' : '' }}" href="{{ route('user.venue-application') }}"><span class="menu-icon"><i class="fa-solid fa-circle-plus"></i></span><span class="label">Daftarkan Venue Baru</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.venue-profile*') ? 'active' : '' }}" href="{{ route('admin.venue-profile') }}"><span class="menu-icon"><i class="fa-solid fa-store"></i></span><span class="label">Profil Venue</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.venue-finance*') ? 'active' : '' }}" href="{{ route('admin.venue-finance') }}"><span class="menu-icon"><i class="fa-solid fa-wallet"></i></span><span class="label">Saldo & Penarikan</span></a>
+            @endif
             <a class="sidebar-link {{ request()->routeIs('admin.courts*') ? 'active' : '' }}"
                href="{{ route('admin.courts') }}">
                 <span class="menu-icon"><i class="fa-solid fa-vector-square"></i></span>

@@ -6,6 +6,11 @@
 @endphp
 <form class="form-card wide-form" action="{{ route('admin.courts.store') }}" method="POST" enctype="multipart/form-data">
     @csrf
+    @if(session('admin_role') === 'venue_admin' && ($venues ?? collect())->count() > 1)
+    <div class="form-group"><label>Venue</label><select class="select-ui" name="venue_id" required>@foreach($venues as $venue)<option value="{{ $venue->id }}" @selected(old('venue_id') == $venue->id)>{{ $venue->name }}</option>@endforeach</select><small>Pilih venue tempat lapangan ini berada.</small></div>
+    @elseif(session('admin_role') === 'venue_admin')
+        <input type="hidden" name="venue_id" value="{{ ($venues ?? collect())->first()?->id }}">
+    @endif
     @if(session('admin_role') === 'superadmin')
     <div class="form-group"><label>Pemilik Admin Venue (opsional)</label><select class="select-ui" name="owner_admin_id"><option value="">Belum ditugaskan</option>@foreach(($venueAdmins ?? []) as $venueAdmin)<option value="{{ $venueAdmin->id }}" {{ old('owner_admin_id') == $venueAdmin->id ? 'selected' : '' }}>{{ $venueAdmin->name }} ({{ $venueAdmin->email }})</option>@endforeach</select><small>Venue yang belum ditugaskan hanya bisa dikelola superadmin.</small></div>
     @endif

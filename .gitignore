@@ -20,3 +20,5 @@
 /status_code
 /transaction_id
 /transaction_status
+# Local environment/credential backup file
+/env

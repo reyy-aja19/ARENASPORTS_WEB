@@ -6,7 +6,7 @@
 <div class="ticket-detail">
   <a class="ticket-btn alt no-print" href="{{ route('user.payments') }}">← Kembali ke Riwayat Booking</a>
   <section class="ticket-paper" style="margin-top:18px">
-    <header class="ticket-banner"><div><div class="ticket-code">ARENASPORTS · E-TICKET</div><h1>{{ $booking->lapangan?->nama ?? 'Lapangan' }}</h1><p>Tunjukkan QR atau kode ini kepada petugas kasir.</p></div><strong style="color:#13785f">✓ LUNAS</strong></header>
+    <header class="ticket-banner"><div><div class="ticket-code">ARENASPORTS · E-TICKET</div><h1>{{ $booking->lapangan?->nama ?? 'Lapangan' }}</h1><p>Tunjukkan QR atau kode ini kepada petugas venue.</p></div><strong style="color:#13785f">✓ LUNAS</strong></header>
     <div class="ticket-content">
       <div>
         <div class="ticket-grid">
@@ -17,7 +17,7 @@
           <div><small>DURASI</small><strong>{{ $booking->hours ?? 1 }} jam</strong></div>
           <div><small>TOTAL DIBAYAR</small><strong>Rp {{ number_format((float) $booking->total_price, 0, ',', '.') }}</strong></div>
           <div><small>STATUS PEMBAYARAN</small><strong>{{ $booking->payment?->status ?? $booking->status }}</strong></div>
-          <div><small>ID TRANSAKSI MIDTRANS</small><strong>{{ $booking->payment?->transaction_id ?? '-' }}</strong></div>
+          <div><small>ID PEMBAYARAN</small><strong>{{ $booking->payment?->transaction_id ?? '-' }}</strong></div>
         </div>
         <div class="ticket-actions no-print"><button class="ticket-btn" onclick="window.print()">Cetak / Simpan PDF</button><a class="ticket-btn alt" href="{{ route('user.bookings') }}">Booking Saya</a></div>
       </div>

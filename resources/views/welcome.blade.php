@@ -46,7 +46,7 @@
     <header class="wrap nav">
         <a href="{{ route('welcome') }}" class="brand" aria-label="ArenaSports beranda"><span class="brand-mark">✳</span><span>Arena<span style="color:var(--lime)">Sports</span></span></a>
         <nav class="navlinks" aria-label="Navigasi utama">
-            <a href="#fitur">Fitur</a><a href="#cara-kerja">Cara kerja</a><a href="#mulai">Tentang ArenaSports</a>
+            <a href="{{ route('user.venues') }}">Cari Venue</a><a href="{{ route('user.courts') }}">Cari Lapangan</a><a href="{{ route('user.openmatches') }}">Open Match</a><a href="#fitur">Fitur</a>
         </nav>
         <div class="nav-actions">
             <a class="btn btn-ghost" href="{{ route('login') }}">Masuk</a>
@@ -61,8 +61,8 @@
                 <h1 id="hero-title">Waktunya main.<br><span>Jadwalkan</span> aksimu.</h1>
                 <p class="lead">Temukan lapangan favorit, amankan jadwal bermain, dan temukan teman satu permainan. Semua kebutuhan olahragamu, dalam satu tempat.</p>
                 <div class="hero-buttons">
-                    <a href="{{ route('register') }}" class="btn btn-primary">Mulai bermain <span aria-hidden="true">↗</span></a>
-                    <a href="{{ route('login') }}" class="btn btn-ghost">Saya sudah punya akun <span aria-hidden="true">→</span></a>
+                    <a href="{{ route('user.venues') }}" class="btn btn-primary">Jelajahi Venue <span aria-hidden="true">↗</span></a>
+                    <a href="{{ route('user.courts') }}" class="btn btn-ghost">Lihat Lapangan <span aria-hidden="true">→</span></a>
                 </div>
                 <div class="trust">
                     <div class="avatars" aria-hidden="true"><span class="avatar">A</span><span class="avatar">R</span><span class="avatar">D</span><span class="avatar">+</span></div>

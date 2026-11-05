@@ -966,3 +966,12 @@ table thead th{background:#f6faf7;color:#506257;font-size:.76rem;letter-spacing:
 table tbody tr:hover{background:#f8fcf9}
 img{max-width:100%}
 @media(max-width:900px){.admin-shell{overflow-x:hidden}.main-content,.admin-content{padding:18px!important}.sidebar{z-index:100}}
+
+/* Marketplace venue management */
+.marketplace-table{width:100%;border-collapse:collapse;min-width:760px;font-size:13px}
+.marketplace-table th,.marketplace-table td{padding:13px 12px;border-bottom:1px solid rgba(16,98,47,.10);text-align:left;vertical-align:top}
+.marketplace-table th{background:#f4faf6;color:#205735;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.marketplace-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+.marketplace-form-grid>label{display:flex;flex-direction:column;gap:7px;font-weight:700;font-size:12px;color:#46594e}
+.marketplace-form-grid input,.marketplace-form-grid textarea{width:100%;padding:11px 12px;border:1px solid #dce8df;border-radius:10px;background:#fff;font:inherit;color:#172b23}
+@media(max-width:700px){.marketplace-form-grid{grid-template-columns:1fr}.marketplace-form-grid>label[style*="grid-column"]{grid-column:auto!important}}

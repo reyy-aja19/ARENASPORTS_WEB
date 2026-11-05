@@ -23,7 +23,7 @@
                     <div class="btn-row wrap">
                         <a class="btn-ui btn-green" href="{{ route('admin.users.edit', $user) }}">Edit</a>
                         <form method="POST" action="{{ route('admin.users.toggle', $user) }}">@csrf<button class="btn-ui btn-gray">{{ $user->status === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan' }}</button></form>
-                        @if($user->role !== 'admin')
+                        @if(!in_array($user->role, ['admin', 'venue_admin']))
                         <form method="POST" action="{{ route('admin.users.delete', $user) }}" onsubmit="return confirm('Hapus user ini?')">@csrf @method('DELETE')<button class="btn-ui btn-red">Hapus</button></form>
                         @endif
                     </div>

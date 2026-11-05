@@ -28,7 +28,8 @@
             <label>Role</label>
             <small class="form-help">Superadmin memiliki akses penuh, termasuk pengelolaan akun dan event Open Match.</small>
             <select class="select-ui" name="role">
-                @foreach(['user' => 'User', 'admin' => 'Admin', 'superadmin' => 'Superadmin'] as $value => $label)
+                @php($roleOptions = ($mode === 'edit' && $user->role === 'venue_admin') ? ['venue_admin' => 'Admin Venue'] : ['user' => 'User', 'admin' => 'Admin', 'superadmin' => 'Superadmin'])
+                @foreach($roleOptions as $value => $label)
                     <option value="{{ $value }}" {{ old('role', $user->role ?? 'user') === $value ? 'selected' : '' }}>{{ $label }}</option>
                 @endforeach
             </select>

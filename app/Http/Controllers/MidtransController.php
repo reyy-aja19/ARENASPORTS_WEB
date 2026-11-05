@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
+use App\Notifications\ArenaUserNotification;
 
 class MidtransController extends Controller
 {
@@ -38,6 +39,12 @@ class MidtransController extends Controller
 
         $payment = Payment::where('booking_id', $booking->id)
             ->firstOrFail();
+
+        abort_unless(
+            strtolower((string) $payment->method) === 'midtrans',
+            409,
+            'Booking ini menggunakan pembayaran Cash, bukan Midtrans.'
+        );
 
         abort_if(
             $payment->status === 'Lunas'
@@ -348,7 +355,7 @@ class MidtransController extends Controller
                     $orderId,
                     $midtransTransactionId,
                     $transactionStatus
-                ): void {
+                ): ?array {
                     $payment = $this->findPaymentByOrderId($orderId)
                         ->lockForUpdate()
                         ->firstOrFail();
@@ -357,43 +364,51 @@ class MidtransController extends Controller
                         ->lockForUpdate()
                         ->firstOrFail();
 
-                    /*
-                     * Jangan menurunkan status yang sudah Lunas.
-                     */
-                    if (
-                        $payment->status === 'Lunas'
-                        || $booking->status === 'Lunas'
-                    ) {
-                        return;
+                    // Pembayaran yang sudah lunas tidak boleh diturunkan statusnya.
+                    if ($payment->status === 'Lunas' || $booking->status === 'Lunas') {
+                        return null;
                     }
 
                     $payment->midtrans_order_id = $orderId;
                     $payment->transaction_id = $midtransTransactionId;
 
                     if ($transactionStatus === 'pending') {
+                        if ($payment->status === 'Gagal' || $booking->status === 'Dibatalkan') {
+                            return null;
+                        }
                         $payment->status = 'Menunggu';
                         $payment->save();
-
-                        return;
+                        return null;
                     }
 
-                    if (in_array($transactionStatus, [
-                        'deny',
-                        'cancel',
-                        'expire',
-                        'failure',
-                    ], true)) {
+                    if (in_array($transactionStatus, ['deny', 'cancel', 'expire', 'failure'], true)) {
+                        // Callback berulang tidak mengirim notifikasi berulang.
+                        if ($payment->status === 'Gagal' && $booking->status === 'Dibatalkan') {
+                            return null;
+                        }
+
                         $payment->status = 'Gagal';
                         $payment->save();
-
                         $booking->status = 'Dibatalkan';
                         $booking->save();
 
-                        return;
+                        $user = User::whereKey($booking->user_id)->firstOrFail();
+                        $label = $transactionStatus === 'expire'
+                            ? 'Kedaluwarsa'
+                            : ($transactionStatus === 'cancel' ? 'Dibatalkan' : 'Gagal');
+                        $user->notify(new ArenaUserNotification(
+                            'Pembayaran ' . $label,
+                            'Pembayaran untuk booking #' . $booking->id . ' ' . strtolower($label) . '. Silakan buat booking baru jika masih ingin bermain.',
+                            route('user.payments', [], false)
+                        ));
+                        return null;
                     }
 
                     $payment->save();
+                    return null;
                 }, 3);
+
+
             }
 
             return response()->json(['ok' => true]);
@@ -460,69 +475,81 @@ class MidtransController extends Controller
         return (int) round(((float) $amount) * 100);
     }
 
-    private function markPaymentAsPaid(
-        string $orderId,
-        string $midtransTransactionId,
-        string $grossAmount
-    ): void {
-        DB::transaction(function () use (
-            $orderId,
-            $midtransTransactionId,
-            $grossAmount
-        ): void {
-            $payment = $this->findPaymentByOrderId($orderId)
-                ->lockForUpdate()
-                ->firstOrFail();
+    
+private function markPaymentAsPaid(
+    string $orderId,
+    string $midtransTransactionId,
+    string $grossAmount
+): void {
+    DB::transaction(function () use (
+        $orderId,
+        $midtransTransactionId,
+        $grossAmount
+    ): ?array {
+        $payment = $this->findPaymentByOrderId($orderId)
+            ->lockForUpdate()
+            ->firstOrFail();
 
-            $booking = Booking::whereKey($payment->booking_id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        $booking = Booking::whereKey($payment->booking_id)
+            ->lockForUpdate()
+            ->firstOrFail();
 
-            $notifiedMinor = $this->toMinorUnits($grossAmount);
-            $bookingMinor = $this->toMinorUnits(
-                (string) $booking->total_price
+        $notifiedMinor = $this->toMinorUnits($grossAmount);
+        $bookingMinor = $this->toMinorUnits(
+            (string) $booking->total_price
+        );
+        $paymentMinor = $this->toMinorUnits(
+            (string) $payment->amount
+        );
+
+        if (
+            $notifiedMinor !== $bookingMinor ||
+            $paymentMinor !== $bookingMinor
+        ) {
+            throw new RuntimeException(
+                'Nominal Midtrans tidak cocok dengan total booking.'
             );
-            $paymentMinor = $this->toMinorUnits(
-                (string) $payment->amount
-            );
+        }
 
-            if (
-                $notifiedMinor !== $bookingMinor
-                || $paymentMinor !== $bookingMinor
-            ) {
-                throw new RuntimeException(
-                    'Nominal Midtrans tidak cocok dengan total booking.'
-                );
-            }
+        $user = User::whereKey($booking->user_id)
+            ->lockForUpdate()
+            ->firstOrFail();
 
-            $user = User::whereKey($booking->user_id)
-                ->lockForUpdate()
-                ->firstOrFail();
+        // Cegah notifikasi dan poin diberikan berulang.
+        $alreadyPaid = $payment->status === 'Lunas'
+            && $booking->status === 'Lunas';
 
-            /*
-             * Poin hanya diberikan satu kali.
-             * Pastikan kolom reward_points_awarded tersedia di payments
-             * dan kolom points tersedia di users.
-             */
-            if (!$payment->reward_points_awarded) {
-                $user->increment('points', 10);
-                $payment->reward_points_awarded = true;
-            }
+        if ($alreadyPaid) {
+            return null;
+        }
 
-            $payment->midtrans_order_id = $orderId;
-            $payment->transaction_id = $midtransTransactionId;
-            $payment->status = 'Lunas';
-            $payment->paid_at = $payment->paid_at ?? now();
-            $payment->save();
+        if (!$payment->reward_points_awarded) {
+            $user->increment('points', 10);
+            $payment->reward_points_awarded = true;
+        }
 
-            $booking->status = 'Lunas';
-            $booking->save();
+        $payment->midtrans_order_id = $orderId;
+        $payment->transaction_id = $midtransTransactionId;
+        $payment->status = 'Lunas';
+        $payment->paid_at = $payment->paid_at ?? now();
+        $payment->save();
 
-            Log::info('Pembayaran Midtrans berhasil disinkronkan.', [
-                'payment_id' => $payment->id,
-                'booking_id' => $booking->id,
-                'order_id' => $orderId,
-            ]);
-        }, 3);
-    }
+        $booking->status = 'Lunas';
+        $booking->save();
+
+        Log::info('Pembayaran Midtrans berhasil disinkronkan.', [
+            'payment_id' => $payment->id,
+            'booking_id' => $booking->id,
+            'order_id' => $orderId,
+        ]);
+
+        $user->notify(new ArenaUserNotification(
+            'Pembayaran Berhasil',
+            'Pembayaran booking #' . $booking->id . ' telah berhasil. Status booking sekarang Lunas. Anda mendapatkan 10 poin.',
+            route('user.bookings', [], false)
+        ));
+
+        return null;
+    }, 3);
+}
 }

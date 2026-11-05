@@ -11,10 +11,14 @@ use App\Models\Redemption;
 use App\Models\Review;
 use App\Models\Reward;
 use App\Models\User;
+use App\Models\Venue;
+use App\Models\VenueWithdrawal;
+use App\Notifications\ArenaUserNotification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -180,22 +184,52 @@ class AdminController extends Controller
         $paymentQuery = Payment::whereIn('booking_id', $ownedBookingIds);
         $revenuePerMonth = (clone $paymentQuery)->where('status', 'Lunas')->whereNotNull('paid_at')->get()->groupBy(fn ($item) => $item->paid_at?->format('m'))->map(fn ($items) => $items->sum('amount'));
         $bookingPerMonth = Booking::whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id'))->get()->groupBy(fn ($item) => $item->booking_date ? date('m', strtotime($item->booking_date)) : null)->map(fn ($items) => $items->count());
-        $userPerMonth = User::where('role', 'user')->get()->groupBy(fn ($item) => $item->created_at?->format('m'))->map(fn ($items) => $items->count());
+        $dashboardUsers = User::where('role', 'user');
+        if (! $this->isSuperadmin($request)) {
+            $dashboardUsers->whereHas('bookings', fn ($q) => $q->whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id')));
+        }
+        $userPerMonth = (clone $dashboardUsers)->get()->groupBy(fn ($item) => $item->created_at?->format('m'))->map(fn ($items) => $items->count());
         $months = collect(range(4, 0))->map(fn ($offset) => now()->subMonths($offset)->format('m'))->all();
 
+        $stats = [
+            ['label' => 'Total Users', 'value' => (clone $dashboardUsers)->count()],
+            ['label' => 'Total Lapangan', 'value' => $this->ownedCourtsQuery($request)->count()],
+            ['label' => 'Total Pendapatan', 'value' => 'Rp ' . number_format((int) (clone $paymentQuery)->where('status', 'Lunas')->sum('amount'), 0, ',', '.')],
+        ];
+        if ($request->session()->get('admin_role') === 'venue_admin') {
+            $grossVenue = (int) (clone $paymentQuery)->whereIn('status', ['Lunas','settlement','capture','success','paid'])->sum('amount');
+            $commissionPercent = max(0, min(100, (float) config('arenasports.venue_commission_percent', 10)));
+            $stats[2] = ['label' => 'Pendapatan Venue (setelah komisi ' . $commissionPercent . '%)', 'value' => 'Rp ' . number_format((int) floor($grossVenue * (100 - $commissionPercent) / 100), 0, ',', '.')];
+        }
+        if ($this->isSuperadmin($request)) {
+            $gross = (int) Payment::whereIn('status', ['Lunas','settlement','capture','success','paid'])
+                ->whereHas('booking.lapangan', fn ($q) => $q->whereNotNull('venue_id'))
+                ->sum('amount');
+            $commissionPercent = max(0, min(100, (float) config('arenasports.venue_commission_percent', 10)));
+            $commission = (int) floor($gross * $commissionPercent / 100);
+            $venueEarnings = $gross - $commission;
+            $pendingWithdrawals = (int) VenueWithdrawal::whereIn('status', ['Menunggu','Diproses'])->sum('amount');
+            $paidWithdrawals = (int) VenueWithdrawal::where('status', 'Dibayar')->sum('amount');
+            $stats = [
+                ['label' => 'Total Booking Berhasil (GMV)', 'value' => 'Rp ' . number_format($gross, 0, ',', '.')],
+                ['label' => 'Pendapatan Platform (Komisi ' . $commissionPercent . '%)', 'value' => 'Rp ' . number_format($commission, 0, ',', '.')],
+                ['label' => 'Hak Pendapatan Admin Venue', 'value' => 'Rp ' . number_format($venueEarnings, 0, ',', '.')],
+                ['label' => 'Penarikan Menunggu / Diproses', 'value' => 'Rp ' . number_format($pendingWithdrawals, 0, ',', '.')],
+                ['label' => 'Penarikan Sudah Dibayar', 'value' => 'Rp ' . number_format($paidWithdrawals, 0, ',', '.')],
+                ['label' => 'Total User', 'value' => User::where('role', 'user')->count()],
+                ['label' => 'Total Venue', 'value' => Venue::count()],
+            ];
+        }
         return view('admin.dashboard', $this->layoutData($request, [
-            'stats' => [
-                ['label' => 'Total Users', 'value' => User::where('role', 'user')->count()],
-                ['label' => 'Total Lapangan', 'value' => $this->ownedCourtsQuery($request)->count()],
-                ['label' => 'Total Pendapatan', 'value' => 'Rp ' . number_format((int) (clone $paymentQuery)->where('status', 'Lunas')->sum('amount'), 0, ',', '.')],
-            ],
+            'stats' => $stats,
+
             'chartLabels' => array_map(fn($m) => now()->setMonth((int) $m)->translatedFormat('M'), $months),
             'chartUsers' => array_map(fn($m) => (int) ($userPerMonth[$m] ?? 0), $months),
             'chartLapangan' => array_map(fn($m) => (int) ($bookingPerMonth[$m] ?? 0), $months),
             'chartRevenue' => array_map(fn($m) => (int) ($revenuePerMonth[$m] ?? 0), $months),
             'userRatio' => [
-                User::where('role', 'user')->where('status', 'Aktif')->count(),
-                User::where('role', 'user')->where('status', '!=', 'Aktif')->count(),
+                (clone $dashboardUsers)->where('status', 'Aktif')->count(),
+                (clone $dashboardUsers)->where('status', '!=', 'Aktif')->count(),
             ],
         ]));
     }
@@ -251,10 +285,16 @@ class AdminController extends Controller
             'email' => ['required', 'email', 'unique:users,email,' . $user->id],
             'phone' => ['nullable', 'string', 'max:50'],
             'points' => ['nullable', 'integer', 'min:0'],
-            'role' => ['required', 'in:admin,user,superadmin'],
+            'role' => ['required', 'in:admin,user,superadmin,venue_admin'],
             'status' => ['required', 'in:Aktif,Nonaktif'],
             'password' => ['nullable', 'string', 'min:6'],
         ]);
+        if ($user->role === 'venue_admin' && $data['role'] !== 'venue_admin') {
+            return back()->withInput()->with('error', 'Role Admin Venue tidak dapat diubah sebelum kepemilikan venue dialihkan.');
+        }
+        if ($data['role'] === 'venue_admin' && ! Venue::where('owner_admin_id', $user->id)->exists()) {
+            return back()->withInput()->with('error', 'Role Admin Venue hanya diberikan melalui persetujuan pengajuan venue.');
+        }
 
         if (!empty($data['password'])) {
             $data['password'] = bcrypt($data['password']);
@@ -280,7 +320,7 @@ class AdminController extends Controller
 
     public function userDelete(User $user): RedirectResponse
     {
-        if (in_array($user->role, ['admin', 'superadmin'], true) || $user->id === request()->session()->get('admin_user_id')) {
+        if (in_array($user->role, ['admin', 'superadmin', 'venue_admin'], true) || $user->id === request()->session()->get('admin_user_id')) {
             return back()->with('error', 'Akun administrator atau akun yang sedang digunakan tidak dapat dihapus.');
         }
         $user->delete();
@@ -295,7 +335,7 @@ class AdminController extends Controller
 
     public function courtCreate(Request $request): View
     {
-        return view('lapangan.create', $this->layoutData($request, ['venueAdmins' => User::where('role', 'admin')->where('status', 'Aktif')->orderBy('name')->get()]));
+        return view('lapangan.create', $this->layoutData($request, ['venueAdmins' => User::whereIn('role', ['admin','venue_admin'])->where('status', 'Aktif')->orderBy('name')->get(), 'venues' => Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->orderBy('name')->get()]));
     }
 
     public function courtStore(Request $request): RedirectResponse
@@ -316,6 +356,7 @@ class AdminController extends Controller
             'fasilitas' => ['nullable', 'array'],
             'fasilitas.*' => ['nullable', 'string', 'max:80'],
             'owner_admin_id' => ['nullable', 'exists:users,id'],
+            'venue_id' => ['nullable', 'integer'],
         ]);
 
         if ($request->hasFile('foto')) {
@@ -328,12 +369,17 @@ class AdminController extends Controller
         $data['rating'] = $data['rating'] ?? 4.5;
         if (! $this->isSuperadmin($request)) {
             $data['owner_admin_id'] = $request->session()->get('admin_user_id');
+            if ($request->session()->get('admin_role') === 'venue_admin') {
+                $venue = Venue::where('owner_admin_id', $data['owner_admin_id'])->findOrFail($data['venue_id'] ?? null);
+                $data['venue_id'] = $venue->id;
+            }
         } else {
             $ownerId = $request->input('owner_admin_id');
-            if ($ownerId && ! User::where('id', $ownerId)->where('role', 'admin')->exists()) {
+            if ($ownerId && ! User::where('id', $ownerId)->whereIn('role', ['admin','venue_admin'])->exists()) {
                 return back()->withInput()->withErrors(['owner_admin_id' => 'Pemilik venue harus akun admin venue aktif.']);
             }
             $data['owner_admin_id'] = $ownerId;
+            $data['venue_id'] = $ownerId ? Venue::where('owner_admin_id', $ownerId)->value('id') : null;
         }
         Lapangan::create($data);
         return redirect()->route('admin.courts')->with('success', 'Lapangan berhasil ditambahkan.');
@@ -342,7 +388,7 @@ class AdminController extends Controller
     public function courtEdit(Request $request, Lapangan $lapangan): View
     {
         $this->ensureCourtAccess($request, $lapangan);
-        return view('lapangan.edit', $this->layoutData($request, ['court' => $lapangan, 'venueAdmins' => User::where('role', 'admin')->where('status', 'Aktif')->orderBy('name')->get()]));
+        return view('lapangan.edit', $this->layoutData($request, ['court' => $lapangan, 'venueAdmins' => User::whereIn('role', ['admin','venue_admin'])->where('status', 'Aktif')->orderBy('name')->get(), 'venues' => Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->orderBy('name')->get()]));
     }
 
     public function courtUpdate(Request $request, Lapangan $lapangan): RedirectResponse
@@ -364,6 +410,7 @@ class AdminController extends Controller
             'fasilitas' => ['nullable', 'array'],
             'fasilitas.*' => ['nullable', 'string', 'max:80'],
             'owner_admin_id' => ['nullable', 'exists:users,id'],
+            'venue_id' => ['nullable', 'integer'],
         ]);
 
         if ($request->hasFile('foto')) {
@@ -376,12 +423,18 @@ class AdminController extends Controller
         $data['foto_gallery'] = array_values(array_filter(array_merge($existingGallery, $newGallery)));
         $data['fasilitas'] = $this->normalizeFacilities($request->input('fasilitas', []));
 
+        if ($request->session()->get('admin_role') === 'venue_admin') {
+            $venue = Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->findOrFail($data['venue_id'] ?? null);
+            $data['owner_admin_id'] = $venue->owner_admin_id;
+            $data['venue_id'] = $venue->id;
+        }
         if ($this->isSuperadmin($request) && $request->filled('owner_admin_id')) {
             $ownerId = $request->input('owner_admin_id');
-            if ($ownerId && ! User::where('id', $ownerId)->where('role', 'admin')->exists()) {
+            if ($ownerId && ! User::where('id', $ownerId)->whereIn('role', ['admin','venue_admin'])->exists()) {
                 return back()->withInput()->withErrors(['owner_admin_id' => 'Pemilik venue harus akun admin venue aktif.']);
             }
             $data['owner_admin_id'] = $ownerId;
+            $data['venue_id'] = $ownerId ? Venue::where('owner_admin_id', $ownerId)->value('id') : null;
         }
         $lapangan->update($data);
         return redirect()->route('admin.courts')->with('success', 'Lapangan berhasil diperbarui.');
@@ -401,7 +454,11 @@ class AdminController extends Controller
     public function bookings(Request $request): View
     {
         $bookings = Booking::with(['user', 'lapangan'])->whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id'))->latest()->get();
-        $users = User::where('role', 'user')->where('status', 'Aktif')->orderBy('name')->get();
+        $usersQuery = User::where('role', 'user')->where('status', 'Aktif');
+        if (! $this->isSuperadmin($request)) {
+            $usersQuery->whereHas('bookings', fn ($q) => $q->whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id')));
+        }
+        $users = $usersQuery->orderBy('name')->get();
         $courts = $this->ownedCourtsQuery($request)->orderBy('nama')->get();
         return view('admin.bookings', $this->layoutData($request, compact('bookings', 'users', 'courts')));
     }
@@ -534,9 +591,18 @@ class AdminController extends Controller
         ]);
 
         abort_unless($this->isSuperadmin($request) || (int) $openMatch->booking?->lapangan?->owner_admin_id === (int) $request->session()->get('admin_user_id'), 403);
+        $wasCancelled = $openMatch->status === 'Dibatalkan';
         if (!empty($data['booking_id'])) { $this->ensureBookingAccess($request, Booking::findOrFail($data['booking_id'])); }
         $data['jumlah_bergabung'] = $data['jumlah_bergabung'] ?? 0;
         $openMatch->update($data);
+        if (!$wasCancelled && $openMatch->status === 'Dibatalkan') {
+            $openMatch->loadMissing('booking.user');
+            $openMatch->booking?->user?->notify(new ArenaUserNotification(
+                'Open Match Dibatalkan',
+                'Open Match ' . $openMatch->title . ' telah dibatalkan oleh pengelola.',
+                route('user.openmatches', [], false)
+            ));
+        }
 
         return back()->with('success', 'Open match berhasil diperbarui.');
     }
@@ -558,6 +624,12 @@ class AdminController extends Controller
     public function openMatchDelete(Request $request, OpenMatch $openMatch): RedirectResponse
     {
         abort_unless($this->isSuperadmin($request) || (int) $openMatch->booking?->lapangan?->owner_admin_id === (int) $request->session()->get('admin_user_id'), 403);
+        $openMatch->loadMissing('booking.user');
+        $openMatch->booking?->user?->notify(new ArenaUserNotification(
+            'Open Match Dibatalkan',
+            'Open Match ' . $openMatch->title . ' telah dihapus oleh pengelola.',
+            route('user.openmatches', [], false)
+        ));
         $openMatch->delete();
         return back()->with('success', 'Open match berhasil dihapus.');
     }
@@ -660,8 +732,74 @@ class AdminController extends Controller
 
     public function paymentVerify(Request $request, Payment $payment): RedirectResponse
     {
-        // Keep the route for older views, but never allow manual confirmation.
-        return back()->with('error', 'Verifikasi manual dinonaktifkan. Status lunas hanya ditetapkan oleh notifikasi Midtrans yang valid.');
+        $payment->loadMissing('booking.lapangan');
+        abort_unless($payment->booking, 404);
+        $this->ensureBookingAccess($request, $payment->booking);
+
+        if (strtolower((string) $payment->method) !== 'cash') {
+            return back()->with(
+                'error',
+                'Pembayaran online tidak dapat dikonfirmasi secara manual. Status Midtrans diperbarui melalui notifikasi resmi.'
+            );
+        }
+
+        if (in_array(strtolower((string) $payment->status), [
+            'lunas', 'settlement', 'capture', 'success', 'paid'
+        ], true)) {
+            return back()->with('success', 'Pembayaran Cash ini sudah dikonfirmasi.');
+        }
+
+        if (in_array(strtolower((string) $payment->status), [
+            'gagal', 'failed', 'deny', 'cancel', 'expire', 'expired'
+        ], true)) {
+            return back()->with('error', 'Pembayaran Cash yang sudah gagal tidak dapat dikonfirmasi.');
+        }
+
+        $paymentChanged = DB::transaction(function () use ($payment): bool {
+            $lockedPayment = Payment::whereKey($payment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $booking = Booking::whereKey($lockedPayment->booking_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (strtolower((string) $lockedPayment->method) !== 'cash') {
+                throw new \RuntimeException('Metode pembayaran bukan Cash.');
+            }
+
+            if (in_array(strtolower((string) $lockedPayment->status), [
+                'lunas', 'settlement', 'capture', 'success', 'paid'
+            ], true)) {
+                return false;
+            }
+
+            if (!in_array(strtolower((string) $lockedPayment->status), [
+                'lunas', 'settlement', 'capture', 'success', 'paid'
+            ], true)) {
+                $lockedPayment->status = 'Lunas';
+                $lockedPayment->paid_at = now();
+                $lockedPayment->transaction_id = $lockedPayment->transaction_id
+                    ?: 'CASH-' . str_pad((string) $lockedPayment->id, 8, '0', STR_PAD_LEFT);
+                $lockedPayment->save();
+
+                $booking->status = 'Lunas';
+                $booking->save();
+                $booking->loadMissing('user');
+                $booking->user?->notify(new ArenaUserNotification(
+                    'Pembayaran Berhasil',
+                    'Pembayaran Cash untuk booking #' . $booking->id . ' telah dikonfirmasi oleh Admin Venue.',
+                    route('user.bookings', [], false)
+                ));
+                return true;
+            }
+            return false;
+        }, 3);
+
+        return back()->with(
+            'success',
+            'Pembayaran Cash berhasil dikonfirmasi. Booking sekarang berstatus Lunas.'
+        );
     }
 
     public function reports(Request $request): View

@@ -37,8 +37,12 @@
   <div class="payment-history-head">
     <span>ARENASPORTS · TRANSAKSI</span>
     <h2>Riwayat Booking</h2>
-    <p>Semua transaksi booking beserta status Midtrans, nominal, waktu pembayaran, dan ID transaksi.</p>
+    <p>Semua transaksi booking, metode pembayaran, nominal, waktu pembayaran, dan status konfirmasi.</p>
   </div>
+
+  @if(session('success'))
+    <div style="padding:13px 15px;border-radius:12px;background:#eaf8f0;color:#176b45;margin-bottom:16px">{{ session('success') }}</div>
+  @endif
 
   <div class="payment-list">
     @forelse($payments as $payment)
@@ -63,7 +67,11 @@
           <div class="payment-ticket-meta">
             <div><small>TANGGAL BERMAIN</small><strong>{{ $payment->booking?->booking_date?->format('d M Y') ?? '-' }}</strong></div>
             <div><small>JAM BERMAIN</small><strong>{{ substr((string)($payment->booking?->start_time ?? ''), 0, 5) }}–{{ substr((string)($payment->booking?->end_time ?? ''), 0, 5) }}</strong></div>
-            <div><small>METODE PEMBAYARAN</small><strong>{{ $payment->method ?? 'Belum dipilih' }}</strong></div>
+            <div><small>METODE PEMBAYARAN</small><strong>{{ $payment->method ?? 'Belum dipilih' }}</strong>
+              @if(strtolower((string) $payment->method) === 'cash' && !$isPaid)
+                <small style="color:#a16207;margin-top:5px">Bayar langsung di venue. Status lunas menunggu konfirmasi Admin Venue.</small>
+              @endif
+            </div>
             <div><small>WAKTU PEMBAYARAN</small><strong>{{ $payment->paid_at?->format('d M Y, H:i') ?? 'Belum tercatat' }}</strong></div>
             <div><small>ID TRANSAKSI</small><strong>{{ $payment->transaction_id ?: 'Belum tersedia' }}</strong></div>
             <div><small>NOMINAL</small><strong class="payment-ticket-amount">Rp {{ number_format((float)$payment->amount, 0, ',', '.') }}</strong></div>

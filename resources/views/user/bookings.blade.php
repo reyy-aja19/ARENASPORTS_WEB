@@ -69,7 +69,7 @@
       <h2>Booking Saya</h2>
       <p>Jadwal bermain dan tiket untuk booking yang sudah lunas.</p>
     </div>
-    <a class="ticket-btn no-print" href="{{ route('user.courts') }}"><i class="fa-solid fa-plus"></i> Booking baru</a>
+    <a class="ticket-btn no-print" href="{{ route('user.venues') }}"><i class="fa-solid fa-plus"></i> Booking baru</a>
   </div>
 
   <div class="ticket-summary">
@@ -168,7 +168,7 @@
         <i class="fa-regular fa-calendar-xmark"></i>
         <strong>Belum ada booking lunas</strong>
         Booking akan tampil di sini setelah pembayaran Midtrans berhasil. Untuk melihat semua transaksi dan status pembayaran, buka Riwayat Booking.
-        <div style="margin-top:16px"><a class="ticket-btn" href="{{ route('user.courts') }}">Cari lapangan</a></div>
+        <div style="margin-top:16px"><a class="ticket-btn" href="{{ route('user.venues') }}">Cari venue</a></div>
       </div>
     @endforelse
   </div>
