@@ -8,6 +8,7 @@ use App\Http\Controllers\ChatbotSettingsController;
 use App\Http\Controllers\MidtransController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\UserNotificationController;
+use App\Http\Controllers\ChatbotController;
 use App\Http\Middleware\CekLogin;
 use Illuminate\Support\Facades\Route;
 
@@ -684,3 +685,8 @@ Route::post('/booking/{booking}/perpanjang-manual', [
         Route::get('/logout', [AdminController::class, 'logoutConfirm'])
             ->name('logout');
     });
+
+    Route::get('/chatbot/nearby-venues', [
+    ChatbotController::class,
+    'nearbyVenues'
+])->name('chatbot.nearby-venues');

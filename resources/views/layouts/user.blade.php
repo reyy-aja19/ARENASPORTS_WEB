@@ -226,60 +226,115 @@
 
 
 {{-- CHATBOT --}}
+{{-- CHATBOT ARENA ASSISTANT --}}
 <div class="u-chat" id="uChat">
 
-    <button class="u-chat-toggle"
-            id="uChatToggle"
-            aria-label="Buka chatbot">
-
+    <button class="u-chat-toggle" id="uChatToggle" type="button">
         <i class="fa-solid fa-comments"></i>
         <span>Butuh bantuan?</span>
-
     </button>
 
     <section class="u-chat-panel" id="uChatPanel" hidden>
 
+        {{-- HEADER --}}
         <div class="u-chat-head">
 
-            <span>
-                <i class="fa-solid fa-robot"></i>
-                Arena Assistant
-            </span>
+            <div class="u-chat-profile">
+                <div class="u-chat-avatar">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
 
-            <button type="button" id="uChatClose" aria-label="Tutup">
-                ×
+                <div>
+                    <strong>Arena Assistant</strong>
+                    <small>
+                        <span class="u-online-dot"></span>
+                        Siap membantu kamu
+                    </small>
+                </div>
+            </div>
+
+            <button type="button" id="uChatClose" aria-label="Tutup chatbot">
+                <i class="fa-solid fa-xmark"></i>
             </button>
 
         </div>
 
+        {{-- AREA CHAT --}}
         <div class="u-chat-body" id="uChatBody">
 
-            <div class="u-chat-bubble">
-                Hai {{ ($user ?? null)?->name ?? 'Pengguna' }}!
-                Aku bisa bantu jawab pertanyaan umum soal booking,
-                pembayaran, dan poin.
+            <div class="u-chat-date">
+                <span>Hari ini</span>
             </div>
 
-            <div class="u-chat-choices">
+            <div class="u-chat-message bot">
+                <div class="u-chat-avatar small">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+
+                <div class="u-chat-message-content">
+                    <div class="u-chat-bubble">
+                        Hai {{ ($user ?? null)?->name ?? 'Pengguna' }}! 👋
+
+                        Selamat datang di ArenaSports.
+
+                        Saya Arena Assistant. Saya siap membantu menjawab
+                        pertanyaan seputar booking lapangan, pembayaran,
+                        venue, poin, dan open match.
+
+                        Ada yang bisa saya bantu?
+                    </div>
+
+                    <small class="u-chat-time">Sekarang</small>
+                </div>
+            </div>
+
+            {{-- PILIHAN PERTANYAAN --}}
+            <div class="u-chat-suggestions">
 
                 <button type="button" data-faq="booking">
-                    Cara booking lapangan
+                    <i class="fa-solid fa-calendar-check"></i>
+                    Cara booking
                 </button>
 
                 <button type="button" data-faq="payment">
-                    Cara pembayaran
+                    <i class="fa-solid fa-wallet"></i>
+                    Pembayaran
                 </button>
 
                 <button type="button" data-faq="points">
-                    Cara tukar poin
+                    <i class="fa-solid fa-coins"></i>
+                    Tukar poin
                 </button>
 
                 <button type="button" data-faq="match">
-                    Tentang open match
+                    <i class="fa-solid fa-users"></i>
+                    Open match
                 </button>
 
             </div>
 
+        </div>
+
+        {{-- INPUT PESAN --}}
+        <form class="u-chat-form" id="uChatForm">
+
+            <input
+                type="text"
+                id="uChatInput"
+                placeholder="Tulis pesan kamu..."
+                autocomplete="off"
+                maxlength="500"
+                required
+            >
+
+            <button type="submit" id="uChatSend" aria-label="Kirim pesan">
+                <i class="fa-solid fa-paper-plane"></i>
+            </button>
+
+        </form>
+
+        <div class="u-chat-footer">
+            ArenaSports Assistant · Bantuan otomatis
         </div>
 
     </section>
@@ -316,50 +371,362 @@
 
 {{-- SCRIPT CHATBOT --}}
 <script>
-(function() {
+(function () {
 
     const toggle = document.getElementById('uChatToggle');
     const panel = document.getElementById('uChatPanel');
     const close = document.getElementById('uChatClose');
     const body = document.getElementById('uChatBody');
+    const form = document.getElementById('uChatForm');
+    const input = document.getElementById('uChatInput');
 
-    if (!toggle || !panel) return;
+    if (!toggle || !panel || !form || !input || !body) return;
 
-    toggle.addEventListener('click', () => {
+    // Buka chatbot
+    toggle.addEventListener('click', function () {
         panel.hidden = !panel.hidden;
+
+        if (!panel.hidden) {
+            input.focus();
+            body.scrollTop = body.scrollHeight;
+        }
     });
 
-    close.addEventListener('click', () => {
+    // Tutup chatbot
+    close.addEventListener('click', function () {
         panel.hidden = true;
     });
 
-    const answers = {
+    // Database jawaban chatbot
+    const knowledge = [
 
-        booking: 'Buka Cari Lapangan, pilih venue, tentukan tanggal, jam mulai, durasi, dan metode pembayaran. Jadwal yang sudah terpakai akan ditolak sistem.',
+        {
+            keywords: [
+                'booking', 'pesan lapangan', 'sewa lapangan',
+                'reservasi', 'memesan lapangan', 'cara pesan',
+                'cara booking', 'pesan tempat'
+            ],
 
-        payment: 'Buka Riwayat Booking untuk melihat detail transaksi dan status pembayaran. Pembayaran diproses otomatis melalui Midtrans.',
+            answer:
+                'Untuk melakukan booking lapangan, ikuti langkah berikut:\n\n' +
+                '1. Buka menu Cari Lapangan.\n' +
+                '2. Pilih venue yang kamu inginkan.\n' +
+                '3. Pilih lapangan yang tersedia.\n' +
+                '4. Tentukan tanggal, jam mulai, dan durasi bermain.\n' +
+                '5. Lanjutkan ke proses pembayaran.\n\n' +
+                'Setelah pembayaran berhasil, booking kamu akan tercatat di sistem.'
+        },
 
-        points: 'Poin dapat ditukar di menu Tukar Poin. Pastikan saldo poin mencukupi; poin yang digunakan akan dipotong dari saldo.',
+        {
+            keywords: [
+                'pembayaran', 'bayar', 'metode bayar',
+                'cara bayar', 'midtrans', 'transaksi',
+                'pembayaran booking'
+            ],
 
-        match: 'Open Match dipakai untuk mencari pemain lain. Pembuatannya memerlukan booking aktif pada tanggal mendatang.'
+            answer:
+                'Pembayaran booking diproses melalui Midtrans.\n\n' +
+                'Setelah memilih lapangan dan jadwal, lanjutkan ke halaman pembayaran. ' +
+                'Ikuti instruksi pembayaran yang tersedia sampai transaksi selesai.\n\n' +
+                'Kamu juga bisa memeriksa status transaksi melalui menu Booking Saya.'
+        },
 
-    };
+        {
+            keywords: [
+                'poin', 'point', 'reward', 'hadiah',
+                'tukar poin', 'menukar poin', 'saldo poin'
+            ],
 
-    body.querySelectorAll('[data-faq]').forEach(btn => {
+            answer:
+                'ArenaSports menyediakan fitur poin dan reward untuk pengguna.\n\n' +
+                'Cara menukar poin:\n' +
+                '1. Buka menu Tukar Poin.\n' +
+                '2. Pilih reward yang tersedia.\n' +
+                '3. Pastikan jumlah poin mencukupi.\n' +
+                '4. Lakukan penukaran.\n\n' +
+                'Saldo poin akan disesuaikan setelah penukaran berhasil.'
+        },
 
-        btn.addEventListener('click', () => {
+        {
+            keywords: [
+                'open match', 'openmatch', 'cari teman',
+                'cari pemain', 'pemain lain', 'gabung match',
+                'bergabung match'
+            ],
 
-            const bubble = document.createElement('div');
+            answer:
+                'Open Match merupakan fitur untuk mencari pemain lain agar kamu bisa bermain bersama.\n\n' +
+                'Kamu dapat membuka menu Open Match untuk melihat pertandingan yang tersedia.\n\n' +
+                'Pembuatan Open Match memerlukan booking aktif pada tanggal mendatang.'
+        },
 
-            bubble.className = 'u-chat-bubble';
+        {
+            keywords: [
+                'venue', 'daftar venue', 'mendaftarkan venue',
+                'pemilik venue', 'pengelola venue'
+            ],
 
-            bubble.textContent =
-                answers[btn.dataset.faq] ||
-                'Silakan hubungi pengelola untuk bantuan lebih lanjut.';
+            answer:
+                'Jika kamu ingin mendaftarkan venue ke ArenaSports, buka menu Daftarkan Venue.\n\n' +
+                'Lengkapi formulir pendaftaran dan dokumen yang diminta. ' +
+                'Pengajuan akan diproses oleh pengelola ArenaSports.'
+        },
 
-            body.appendChild(bubble);
+        {
+            keywords: [
+                'lapangan', 'cari lapangan', 'fasilitas lapangan',
+                'jadwal lapangan', 'tersedia'
+            ],
 
-            body.scrollTop = body.scrollHeight;
+            answer:
+                'Untuk mencari lapangan, buka menu Cari Lapangan.\n\n' +
+                'Kamu dapat melihat informasi lapangan, venue, fasilitas, dan jadwal yang tersedia. ' +
+                'Pilih lapangan yang sesuai dengan kebutuhanmu.'
+        },
+
+        {
+            keywords: [
+                'riwayat', 'booking saya', 'pesanan saya',
+                'status booking', 'pesanan'
+            ],
+
+            answer:
+                'Kamu bisa melihat riwayat pemesanan melalui menu Booking Saya.\n\n' +
+                'Di sana kamu dapat memeriksa detail booking dan status transaksi.'
+        },
+
+        {
+            keywords: [
+                'akun', 'profil', 'ubah profil',
+                'edit profil', 'ganti nama', 'foto profil'
+            ],
+
+            answer:
+                'Untuk mengubah informasi akun, buka halaman Profil.\n\n' +
+                'Di halaman tersebut kamu dapat memperbarui informasi pribadi dan foto profil.'
+        },
+
+        {
+            keywords: [
+                'login', 'masuk akun', 'tidak bisa login',
+                'lupa password', 'kata sandi'
+            ],
+
+            answer:
+                'Untuk masuk ke ArenaSports, gunakan email dan password yang sudah terdaftar.\n\n' +
+                'Pastikan email dan password sudah benar. Jika masih mengalami kendala, silakan hubungi pengelola.'
+        },
+
+        {
+            keywords: [
+                'daftar', 'register', 'registrasi akun',
+                'buat akun', 'akun baru'
+            ],
+
+            answer:
+                'Untuk membuat akun ArenaSports:\n\n' +
+                '1. Klik tombol Daftar.\n' +
+                '2. Isi nama, email, dan password.\n' +
+                '3. Lengkapi konfirmasi pendaftaran.\n' +
+                '4. Ikuti instruksi yang ditampilkan sampai akun berhasil dibuat.'
+        },
+
+        {
+            keywords: [
+                'admin', 'customer service', 'cs',
+                'hubungi', 'kontak', 'bantuan petugas'
+            ],
+
+            answer:
+                'Jika kamu membutuhkan bantuan lebih lanjut, silakan hubungi admin atau pengelola venue terkait melalui kontak resmi yang tersedia.'
+        }
+
+    ];
+
+    // Membuat pesan
+    function addMessage(message, type) {
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'u-chat-message ' + type;
+
+        if (type === 'bot') {
+
+            const avatar = document.createElement('div');
+            avatar.className = 'u-chat-avatar small';
+            avatar.innerHTML = '<i class="fa-solid fa-robot"></i>';
+
+            wrapper.appendChild(avatar);
+        }
+
+        const content = document.createElement('div');
+        content.className = 'u-chat-message-content';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'u-chat-bubble';
+
+        // Menggunakan textContent agar pesan tidak dieksekusi sebagai HTML
+        bubble.textContent = message;
+
+        const time = document.createElement('small');
+        time.className = 'u-chat-time';
+
+        time.textContent = new Date().toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        content.appendChild(bubble);
+        content.appendChild(time);
+
+        wrapper.appendChild(content);
+        body.appendChild(wrapper);
+
+        body.scrollTop = body.scrollHeight;
+    }
+
+    // Menampilkan indikator bot sedang mengetik
+    function showTyping() {
+
+        const typing = document.createElement('div');
+        typing.className = 'u-chat-message bot';
+        typing.id = 'uChatTyping';
+
+        typing.innerHTML = `
+            <div class="u-chat-avatar small">
+                <i class="fa-solid fa-robot"></i>
+            </div>
+
+            <div class="u-chat-message-content">
+                <div class="u-chat-bubble u-typing">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        `;
+
+        body.appendChild(typing);
+        body.scrollTop = body.scrollHeight;
+    }
+
+    // Menghapus indikator mengetik
+    function removeTyping() {
+        document.getElementById('uChatTyping')?.remove();
+    }
+
+    // Mencari jawaban berdasarkan kata kunci
+    function getAnswer(message) {
+
+        const text = message
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (/^(hai|halo|hello|hi|hei|pagi|siang|sore|malam)(\s|$)/.test(text)) {
+            return 'Halo! 👋 Ada yang bisa Arena Assistant bantu hari ini?';
+        }
+
+        if (/\b(terima kasih|makasih|thanks|thank you|thx)\b/.test(text)) {
+            return 'Sama-sama! 😊 Senang bisa membantu. Jangan ragu bertanya lagi jika kamu membutuhkan bantuan.';
+        }
+
+        if (/\b(bye|dadah|sampai jumpa)\b/.test(text)) {
+            return 'Sampai jumpa! Terima kasih sudah menggunakan ArenaSports. Selamat berolahraga! ⚽';
+        }
+
+        for (const item of knowledge) {
+
+            const matched = item.keywords.some(keyword => {
+
+                return text.includes(keyword.toLowerCase());
+
+            });
+
+            if (matched) {
+                return item.answer;
+            }
+        }
+
+        return 'Maaf, saya belum memahami pertanyaan tersebut. 😅\n\n' +
+            'Saat ini saya bisa membantu menjawab pertanyaan tentang:\n\n' +
+            '• Booking lapangan\n' +
+            '• Pembayaran\n' +
+            '• Tukar poin dan reward\n' +
+            '• Open Match\n' +
+            '• Pendaftaran venue\n' +
+            '• Profil dan akun\n\n' +
+            'Coba gunakan kata kunci yang lebih spesifik, ya!';
+    }
+
+    // Mengirim pesan
+    // Mengirim pesan
+async function sendMessage(message) {
+
+    message = message.trim();
+
+    if (!message) return;
+
+    addMessage(message, 'user');
+
+    input.value = '';
+    input.disabled = true;
+
+    showTyping();
+
+    let answer;
+    const text = message.toLowerCase();
+
+    const asksNearby =
+        text.includes('terdekat') ||
+        text.includes('dekat saya') ||
+        text.includes('sekitar saya') ||
+        text.includes('di sekitar');
+
+    const asksOpen =
+        text.includes('masih buka') ||
+        text.includes('sedang buka') ||
+        text.includes('yang buka') ||
+        text.includes('buka sekarang');
+
+    if (asksOpen && text.includes('venue')) {
+    answer = await findNearbyVenues();
+} else {
+    answer = getAnswer(message);
+
+    await new Promise(resolve => setTimeout(resolve, 900));
+}
+
+    removeTyping();
+
+    addMessage(answer, 'bot');
+
+    input.disabled = false;
+    input.focus();
+}
+
+    // Submit form
+    form.addEventListener('submit', function (e) {
+
+        e.preventDefault();
+
+        sendMessage(input.value);
+
+    });
+
+    // Pilihan pertanyaan cepat
+    body.querySelectorAll('[data-faq]').forEach(function (button) {
+
+        button.addEventListener('click', function () {
+
+            const questions = {
+                booking: 'Bagaimana cara booking lapangan?',
+                payment: 'Bagaimana cara melakukan pembayaran?',
+                points: 'Bagaimana cara menukar poin?',
+                match: 'Apa itu open match?'
+            };
+
+            sendMessage(questions[this.dataset.faq]);
 
         });
 

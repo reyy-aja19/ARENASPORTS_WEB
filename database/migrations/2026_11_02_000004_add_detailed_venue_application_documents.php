@@ -50,7 +50,10 @@ return new class extends Migration
                 $table->unsignedBigInteger('file_size')->nullable();
                 $table->timestamps();
 
-                $table->index(['venue_application_id', 'document_type']);
+                $table->index(
+    ['venue_application_id', 'document_type'],
+    'vad_app_doc_type_idx'
+);
             });
         }
     }

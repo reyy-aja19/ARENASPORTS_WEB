@@ -1,59 +1,51 @@
+
 <?php
 
-namespace App\Models;
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
-
-class BookingExtension extends Model
+return new class extends Migration
 {
-    use HasFactory;
-
-    protected $fillable = [
-        'booking_id',
-        'user_id',
-        'admin_user_id',
-        'hours',
-        'previous_end_time',
-        'new_end_time',
-        'amount',
-        'payment_method',
-        'status',
-        'note',
-        'processed_at',
-    ];
-
-    protected function casts(): array
+    public function up(): void
     {
-        return [
-            'amount' => 'decimal:2',
-            'processed_at' => 'datetime',
-        ];
+        Schema::create('booking_extensions', function (Blueprint $table) {
+            $table->id();
+
+            $table->foreignId('booking_id')
+                ->constrained('bookings')
+                ->cascadeOnDelete();
+
+            $table->foreignId('user_id')
+                ->constrained('users')
+                ->cascadeOnDelete();
+
+            $table->foreignId('admin_user_id')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
+            $table->unsignedInteger('hours');
+
+            $table->dateTime('previous_end_time');
+            $table->dateTime('new_end_time');
+
+            $table->decimal('amount', 12, 2);
+
+            $table->string('payment_method')->nullable();
+
+            $table->string('status')->default('pending');
+
+            $table->text('note')->nullable();
+
+            $table->timestamp('processed_at')->nullable();
+
+            $table->timestamps();
+        });
     }
 
-    public function booking()
+    public function down(): void
     {
-        return $this->belongsTo(Booking::class);
+        Schema::dropIfExists('booking_extensions');
     }
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function admin()
-    {
-        return $this->belongsTo(
-            User::class,
-            'admin_user_id'
-        );
-    }
-
-    public function payment()
-    {
-        return $this->hasOne(
-            Payment::class,
-            'booking_extension_id'
-        );
-    }
-}
+};
