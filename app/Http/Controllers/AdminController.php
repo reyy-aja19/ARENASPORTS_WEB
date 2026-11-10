@@ -348,7 +348,8 @@ class AdminController extends Controller
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'harga' => ['required', 'numeric', 'min:0'],
             'rating' => ['nullable', 'numeric', 'between:0,5'],
-            'status' => ['required', 'string'],
+            'status' => ['required', 'in:Tersedia,Perawatan,Perbaikan,Penuh'],
+            'maintenance_note' => ['nullable', 'string', 'max:1000'],
             'deskripsi' => ['nullable', 'string'],
             'foto' => ['nullable', 'image', 'max:4096'],
             'foto_gallery' => ['nullable', 'array'],
@@ -367,6 +368,9 @@ class AdminController extends Controller
         $data['fasilitas'] = $this->normalizeFacilities($request->input('fasilitas', []));
 
         $data['rating'] = $data['rating'] ?? 4.5;
+        if (!in_array($data['status'], ['Perawatan', 'Perbaikan'], true)) {
+            $data['maintenance_note'] = null;
+        }
         if (! $this->isSuperadmin($request)) {
             $data['owner_admin_id'] = $request->session()->get('admin_user_id');
             if ($request->session()->get('admin_role') === 'venue_admin') {
@@ -402,7 +406,8 @@ class AdminController extends Controller
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'harga' => ['required', 'numeric', 'min:0'],
             'rating' => ['nullable', 'numeric', 'between:0,5'],
-            'status' => ['required', 'string'],
+            'status' => ['required', 'in:Tersedia,Perawatan,Perbaikan,Penuh'],
+            'maintenance_note' => ['nullable', 'string', 'max:1000'],
             'deskripsi' => ['nullable', 'string'],
             'foto' => ['nullable', 'image', 'max:4096'],
             'foto_gallery' => ['nullable', 'array'],
@@ -422,6 +427,9 @@ class AdminController extends Controller
         $newGallery = $this->publicUploadMultiple($request, 'foto_gallery', 'courts');
         $data['foto_gallery'] = array_values(array_filter(array_merge($existingGallery, $newGallery)));
         $data['fasilitas'] = $this->normalizeFacilities($request->input('fasilitas', []));
+        if (!in_array($data['status'], ['Perawatan', 'Perbaikan'], true)) {
+            $data['maintenance_note'] = null;
+        }
 
         if ($request->session()->get('admin_role') === 'venue_admin') {
             $venue = Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->findOrFail($data['venue_id'] ?? null);
@@ -743,11 +751,8 @@ class AdminController extends Controller
             );
         }
 
-        if (in_array(strtolower((string) $payment->status), [
-            'lunas', 'settlement', 'capture', 'success', 'paid'
-        ], true)) {
-            return back()->with('success', 'Pembayaran Cash ini sudah dikonfirmasi.');
-        }
+        // Tetap masuk transaksi untuk memperbaiki pembayaran lama yang sudah
+        // Lunas tetapi penanda pemberian poinnya belum tersimpan.
 
         if (in_array(strtolower((string) $payment->status), [
             'gagal', 'failed', 'deny', 'cancel', 'expire', 'expired'
@@ -768,9 +773,19 @@ class AdminController extends Controller
                 throw new \RuntimeException('Metode pembayaran bukan Cash.');
             }
 
-            if (in_array(strtolower((string) $lockedPayment->status), [
+            $isAlreadyPaid = in_array(strtolower((string) $lockedPayment->status), [
                 'lunas', 'settlement', 'capture', 'success', 'paid'
-            ], true)) {
+            ], true);
+
+            $booking->loadMissing('user');
+            if (!$lockedPayment->reward_points_awarded && $booking->user) {
+                $lockedUser = User::whereKey($booking->user_id)->lockForUpdate()->firstOrFail();
+                $lockedUser->increment('points', 10);
+                $lockedPayment->reward_points_awarded = true;
+                $lockedPayment->save();
+            }
+
+            if ($isAlreadyPaid) {
                 return false;
             }
 
@@ -785,7 +800,6 @@ class AdminController extends Controller
 
                 $booking->status = 'Lunas';
                 $booking->save();
-                $booking->loadMissing('user');
                 $booking->user?->notify(new ArenaUserNotification(
                     'Pembayaran Berhasil',
                     'Pembayaran Cash untuk booking #' . $booking->id . ' telah dikonfirmasi oleh Admin Venue.',

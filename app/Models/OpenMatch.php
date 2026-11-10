@@ -33,4 +33,9 @@ class OpenMatch extends Model
     {
         return $this->belongsTo(Booking::class);
     }
+
+    public function messages()
+    {
+        return $this->hasMany(OpenMatchMessage::class);
+    }
 }

@@ -70,6 +70,15 @@
                 <span class="menu-icon"><i class="fa-solid fa-vector-square"></i></span>
                 <span class="label">Management Lapangan</span>
             </a>
+            @if($isSuperAdmin || $isVenueAdmin)
+    <a class="sidebar-link {{ request()->routeIs('admin.bookings*') ? 'active' : '' }}"
+       href="{{ route('admin.bookings') }}">
+        <span class="menu-icon">
+            <i class="fa-solid fa-calendar-check"></i>
+        </span>
+        <span class="label">Manajemen Booking</span>
+    </a>
+@endif
 
             <a class="sidebar-link {{ request()->routeIs('admin.reviews*') ? 'active' : '' }}"
                href="{{ route('admin.reviews') }}">

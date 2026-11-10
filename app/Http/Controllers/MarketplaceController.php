@@ -175,8 +175,32 @@ class MarketplaceController extends Controller
             'company_phone' => 'nullable|string|max:30',
             'company_description' => 'nullable|string|max:3000',
             'facilities' => 'nullable|array|max:30',
-            'facilities.*' => 'string|max:80'
+            'facilities.*' => 'string|max:80',
+            'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
+
+        // Simpan foto venue ke storage/app/public/venues.
+        // Foto lama baru dihapus setelah foto baru berhasil disimpan.
+        if ($request->hasFile('photo')) {
+            $newPhotoPath = $request->file('photo')->store('venues', 'public');
+
+            $oldPhotoPath = ltrim((string) $venue->photo, '/');
+            if (str_starts_with($oldPhotoPath, 'storage/')) {
+                $oldPhotoPath = substr($oldPhotoPath, strlen('storage/'));
+            }
+
+            if ($oldPhotoPath !== '' && Storage::disk('public')->exists($oldPhotoPath)) {
+                Storage::disk('public')->delete($oldPhotoPath);
+            }
+
+            // Konsisten dengan proses persetujuan pengajuan venue yang menyimpan prefix storage/.
+            $data['photo'] = 'storage/' . $newPhotoPath;
+        }
+
+        unset($data['photo']); // field file tidak pernah dikirim sebagai object ke model
+        if (isset($newPhotoPath)) {
+            $data['photo'] = 'storage/' . $newPhotoPath;
+        }
 
         $venue->update($data);
 

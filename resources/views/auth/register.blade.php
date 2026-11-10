@@ -1,1 +1,296 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Daftar · ARENASPORTS</title><link rel="stylesheet" href="{{ asset('user-ui.css') }}"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"></head><body><div class="u-auth"><section class="u-auth-hero"><div class="u-brand" style="color:white"><span class="u-logo" style="background:#ffffff20"><i class="fa-solid fa-futbol"></i></span><span>ARENA<span style="color:#9ee5ba">SPORTS</span></span></div><h1>Game on.<br>Book your court.</h1><p>Buat akun dan nikmati cara yang lebih praktis untuk merencanakan olahraga bersama teman.</p></section><section class="u-auth-form"><div class="u-auth-card"><h2>Buat akun baru</h2><p>Daftar sebagai pengguna ARENASPORTS.</p>@if($errors->any())<div class="u-alert error">{{ $errors->first() }}</div>@endif<form method="POST" action="{{ route('register.submit') }}">@csrf<div class="u-field"><label>Nama lengkap</label><input name="name" value="{{ old('name') }}" required autocomplete="name"></div><div class="u-field"><label>Email</label><input type="email" name="email" value="{{ old('email') }}" required autocomplete="email"></div><div class="u-field"><label>Nomor HP (opsional)</label><input name="phone" value="{{ old('phone') }}" autocomplete="tel"></div><div class="u-field"><label>Password (minimal 8 karakter)</label><input type="password" name="password" required minlength="8" autocomplete="new-password"></div><div class="u-field"><label>Konfirmasi password</label><input type="password" name="password_confirmation" required minlength="8" autocomplete="new-password"></div><button class="u-btn" type="submit">Buat akun <i class="fa-solid fa-arrow-right"></i></button></form><div style="text-align:center;margin-top:14px"><a class="u-btn ghost" style="display:block;text-decoration:none" href="{{ route('auth.google.redirect') }}"><i class="fa-brands fa-google"></i> Daftar dengan Google</a></div><div style="text-align:center;margin-top:12px"><a class="u-btn ghost" style="display:block;text-decoration:none" href="{{ route('phone.register') }}"><i class="fa-brands fa-whatsapp"></i> Daftar dengan WhatsApp</a></div><p style="margin-top:20px;text-align:center">Sudah punya akun? <a href="{{ route('login') }}">Login</a></p></div></section></div></body></html>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#073e2b">
+
+    <title>Daftar - ARENASPORTS</title>
+
+    <link rel="stylesheet" href="{{ asset('user-ui.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        .u-register-card .u-field {
+            margin: 13px 0;
+        }
+
+        .u-register-card .u-field input {
+            min-height: 44px;
+        }
+
+        .u-register-card .u-field label {
+            margin-bottom: 6px;
+        }
+
+        .u-register-card .u-register-submit {
+            margin-top: 8px;
+        }
+
+        .u-register-card .u-register-options {
+            display: grid;
+            gap: 9px;
+            margin-top: 12px;
+        }
+
+        .u-register-card .u-register-options a {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            min-height: 45px;
+            padding: 11px;
+            border: 1px solid #dfe9e2;
+            border-radius: 11px;
+            color: #35483d;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .u-register-card .u-register-options a:hover {
+            background: #f3faf5;
+        }
+
+        .u-register-card .u-register-login {
+            text-align: center;
+            margin: 17px 0 0;
+            font-size: 12px;
+        }
+
+        @media(max-width: 650px) {
+            .u-register-card {
+                padding: 22px 19px;
+            }
+        }
+    </style>
+</head>
+
+<body class="u-login-page">
+
+<main class="u-auth u-auth-premium">
+
+    <!-- PANEL KIRI -->
+    <section class="u-auth-hero">
+
+        <a class="u-brand" href="{{ route('welcome') }}">
+            <span class="u-logo">
+                <i class="fa-solid fa-futbol"></i>
+            </span>
+
+            <span>
+                ARENA<span style="color:#a5efbf">SPORTS</span>
+                <small style="color:#c7e7d3">FIND YOUR GAME</small>
+            </span>
+        </a>
+
+        <div class="u-auth-copy">
+
+            <span class="u-auth-kicker">
+                <i class="fa-solid fa-bolt"></i>
+                JOIN OUR COMMUNITY
+            </span>
+
+            <h1>
+                Mulai perjalananmu.<br>
+                <em>Temukan permainan.</em>
+            </h1>
+
+            <p>
+                Bergabung dengan ArenaSports dan nikmati kemudahan
+                mencari lapangan, melakukan booking, serta bermain
+                bersama teman.
+            </p>
+
+            <div class="u-auth-benefits">
+                <span>
+                    <i class="fa-solid fa-location-dot"></i>
+                    Venue pilihan
+                </span>
+
+                <span>
+                    <i class="fa-solid fa-calendar-check"></i>
+                    Booking mudah
+                </span>
+
+                <span>
+                    <i class="fa-solid fa-trophy"></i>
+                    Poin &amp; reward
+                </span>
+            </div>
+
+        </div>
+
+        <div class="u-auth-footnote">
+            &copy; {{ date('Y') }} ArenaSports - Play more, worry less.
+        </div>
+
+    </section>
+
+    <!-- PANEL KANAN -->
+    <section class="u-auth-form">
+
+        <div class="u-auth-card u-register-card">
+
+            <div class="u-auth-mobile-brand">
+                ARENA<span>SPORTS</span>
+            </div>
+
+            <span class="u-form-kicker">
+                BUAT AKUN BARU
+            </span>
+
+            <h2>Daftar ArenaSports</h2>
+
+            <p>
+                Buat akun dan mulai pengalaman olahraga yang lebih mudah.
+            </p>
+
+            @if(session('error'))
+                <div class="u-alert error">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @if(session('success'))
+                <div class="u-alert success">
+                    <i class="fa-solid fa-circle-check"></i>
+                    {{ session('success') }}
+                </div>
+            @endif
+
+            @if($errors->any())
+                <div class="u-alert error">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    {{ $errors->first() }}
+                </div>
+            @endif
+
+            <form method="POST" action="{{ route('register.submit') }}">
+                @csrf
+
+                <div class="u-field">
+                    <label for="name">Nama lengkap</label>
+
+                    <input
+                        id="name"
+                        type="text"
+                        name="name"
+                        value="{{ old('name') }}"
+                        placeholder="Masukkan nama lengkap"
+                        required
+                        autocomplete="name"
+                    >
+                </div>
+
+                <div class="u-field">
+                    <label for="email">Alamat email</label>
+
+                    <input
+                        id="email"
+                        type="email"
+                        name="email"
+                        value="{{ old('email') }}"
+                        placeholder="nama@email.com"
+                        required
+                        autocomplete="email"
+                    >
+                </div>
+
+                <div class="u-field">
+                    <label for="phone">Nomor HP (opsional)</label>
+
+                    <input
+                        id="phone"
+                        type="tel"
+                        name="phone"
+                        value="{{ old('phone') }}"
+                        placeholder="08xxxxxxxxxx"
+                        autocomplete="tel"
+                    >
+                </div>
+
+                <div class="u-field">
+                    <label for="password">
+                        Password (minimal 8 karakter)
+                    </label>
+
+                    <input
+                        id="password"
+                        type="password"
+                        name="password"
+                        placeholder="Buat password"
+                        required
+                        minlength="8"
+                        autocomplete="new-password"
+                    >
+                </div>
+
+                <div class="u-field">
+                    <label for="password_confirmation">
+                        Konfirmasi password
+                    </label>
+
+                    <input
+                        id="password_confirmation"
+                        type="password"
+                        name="password_confirmation"
+                        placeholder="Ulangi password"
+                        required
+                        minlength="8"
+                        autocomplete="new-password"
+                    >
+                </div>
+
+                <button
+                    class="u-btn u-register-submit"
+                    type="submit"
+                >
+                    Buat akun ArenaSports
+                    <i class="fa-solid fa-arrow-right"></i>
+                </button>
+
+            </form>
+
+            <div class="u-login-divider">
+                <span>atau daftar dengan</span>
+            </div>
+
+            <div class="u-register-options">
+
+                <a href="{{ route('auth.google.redirect') }}">
+                    <i class="fa-brands fa-google"></i>
+                    Daftar dengan Google
+                </a>
+
+                <a href="{{ route('phone.register') }}">
+                    <i class="fa-brands fa-whatsapp"></i>
+                    Daftar dengan WhatsApp
+                </a>
+
+            </div>
+
+            <p class="u-register-login">
+                Sudah punya akun?
+                <a href="{{ route('login') }}">Masuk sekarang</a>
+            </p>
+
+            <div class="u-login-security">
+                <i class="fa-solid fa-shield-halved"></i>
+                Informasi akun kamu dilindungi.
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+</body>
+</html>

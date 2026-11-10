@@ -39,6 +39,12 @@
                     <span>Status: {{ $court->status }}</span>
                 </div>
                 <div class="muted" style="margin-top:8px;">Rp {{ number_format($court->harga,0,',','.') }}/jam</div>
+                @if(in_array($court->status, ['Perawatan', 'Perbaikan']))
+                    <div style="margin-top:9px;padding:10px 12px;border-radius:10px;background:#fff7e6;border:1px solid #f4d9a6;color:#875b13;font-size:13px;">
+                        <strong><i class="fa-solid fa-screwdriver-wrench"></i> Sedang {{ strtolower($court->status) }}</strong>
+                        <div style="margin-top:4px;">{{ $court->maintenance_note ?: 'Belum ada keterangan perbaikan dari admin.' }}</div>
+                    </div>
+                @endif
                 @if($court->deskripsi)
                     <div class="muted" style="margin-top:6px;">{{ $court->deskripsi }}</div>
                 @endif

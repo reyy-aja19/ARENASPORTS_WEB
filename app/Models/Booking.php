@@ -43,12 +43,22 @@ class Booking extends Model
         return $this->hasOne(OpenMatch::class);
     }
 
+    // Pembayaran booking awal saja
     public function payment()
     {
-        return $this->hasOne(Payment::class);
+        return $this->hasOne(Payment::class)
+            ->whereNull('booking_extension_id');
     }
+
+    // Semua pembayaran, termasuk perpanjangan
     public function payments()
     {
-    return $this->hasMany(Payment::class);
+        return $this->hasMany(Payment::class);
+    }
+
+    // Riwayat perpanjangan booking
+    public function extensions()
+    {
+        return $this->hasMany(BookingExtension::class);
     }
 }

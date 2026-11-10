@@ -25,7 +25,12 @@
         <div class="form-group"><label>Longitude (opsional)</label><input class="input-ui" name="longitude" type="number" step="any" min="-180" max="180" value="{{ old('longitude', $court->longitude) }}" placeholder="108.3200"></div>
         <div class="form-group"><label>Harga per Jam</label><input class="input-ui" name="harga" type="number" value="{{ old('harga', $court->harga) }}"></div>
         <div class="form-group"><label>Rating</label><input class="input-ui" name="rating" type="number" min="0" max="5" step="0.1" value="{{ old('rating', $court->rating) }}"></div>
-        <div class="form-group"><label>Status</label><select class="select-ui" name="status">@foreach(['Tersedia','Perawatan','Penuh'] as $status)<option value="{{ $status }}" {{ old('status', $court->status) === $status ? 'selected' : '' }}>{{ $status }}</option>@endforeach</select></div>
+        <div class="form-group"><label>Status</label><select class="select-ui" name="status">@foreach(['Tersedia','Perawatan','Perbaikan','Penuh'] as $status)<option value="{{ $status }}" {{ old('status', $court->status) === $status ? 'selected' : '' }}>{{ $status }}</option>@endforeach</select></div>
+    </div>
+    <div class="form-group">
+        <label>Informasi Perawatan / Kerusakan</label>
+        <textarea class="textarea-ui" name="maintenance_note" rows="3" placeholder="Contoh: Lapangan sedang diperbaiki pada bagian rumput sintetis.">{{ old('maintenance_note', $court->maintenance_note ?? '') }}</textarea>
+        <small class="muted">Isi jika status lapangan Perawatan atau Perbaikan. Informasi ini akan terlihat oleh calon penyewa.</small>
     </div>
     <div class="form-group"><label>Deskripsi</label><textarea class="textarea-ui" name="deskripsi">{{ old('deskripsi', $court->deskripsi) }}</textarea></div>
 

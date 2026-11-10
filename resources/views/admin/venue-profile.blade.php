@@ -280,6 +280,40 @@
         margin-top: 6px;
     }
 
+    .venue-photo-upload {
+        grid-column: 1 / -1;
+        padding: 18px;
+        border: 1px dashed #9ac9a8;
+        border-radius: 14px;
+        background: #f5fbf6;
+    }
+
+    .venue-photo-preview {
+        width: 100%;
+        max-width: 420px;
+        height: 210px;
+        object-fit: cover;
+        display: block;
+        margin: 12px 0;
+        border-radius: 12px;
+        border: 1px solid #dcebe0;
+        background: #e8f7ec;
+    }
+
+    .venue-photo-upload input[type="file"] {
+        display: block;
+        width: 100%;
+        margin-top: 10px;
+        padding: 10px;
+        border: 1px solid #dce7df;
+        border-radius: 9px;
+        background: #fff;
+    }
+
+    .venue-photo-upload .venue-form-help {
+        line-height: 1.6;
+    }
+
     @media (max-width: 900px) {
         .venue-sports-grid {
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -373,12 +407,50 @@
 
         <form
             method="POST"
+            enctype="multipart/form-data"
             action="{{ route('admin.venue-profile.update') }}"
             class="venue-form-grid"
         >
             @csrf
             @method('PUT')
             <input type="hidden" name="venue_id" value="{{ $venue->id }}">
+
+            <div class="venue-photo-upload">
+                <label for="photo" style="font-weight:750;color:#174d2d;">Foto Utama Venue</label>
+                @if($venue->photo)
+                    <img
+                        id="venue-photo-preview"
+                        class="venue-photo-preview"
+                        src="{{ asset($venue->photo) }}"
+                        alt="Foto {{ $venue->name }}"
+                    >
+                @else
+                    <img
+                        id="venue-photo-preview"
+                        class="venue-photo-preview"
+                        src=""
+                        alt="Pratinjau foto venue"
+                        style="display:none;"
+                    >
+                    <div id="venue-photo-empty" style="max-width:420px;height:150px;margin:12px 0;display:flex;align-items:center;justify-content:center;gap:10px;border-radius:12px;background:#e8f7ec;color:#168653;">
+                        <i class="fa-solid fa-image" style="font-size:30px;"></i>
+                        <span>Belum ada foto venue</span>
+                    </div>
+                @endif
+                <input
+                    type="file"
+                    id="photo"
+                    name="photo"
+                    accept="image/jpeg,image/png,image/webp"
+                >
+                <div class="venue-form-help">
+                    Unggah foto depan venue atau fasilitas utama. Format JPG, PNG, atau WEBP, maksimal 5 MB.
+                    Foto ini akan ditampilkan pada halaman Temukan Venue.
+                </div>
+                @error('photo')
+                    <span class="venue-field-error">{{ $message }}</span>
+                @enderror
+            </div>
 
             <div class="venue-form-group full-width"><label for="company_name">Nama Perusahaan / Usaha</label><input type="text" id="company_name" name="company_name" value="{{ old('company_name', $venue->company_name) }}" maxlength="180"></div>
             <div class="venue-form-group"><label for="business_type">Jenis Badan Usaha</label><input type="text" id="business_type" name="business_type" value="{{ old('business_type', $venue->business_type) }}" maxlength="80"></div>
@@ -569,5 +641,37 @@
         </form>
     </div>
 </div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const input = document.getElementById('photo');
+    const preview = document.getElementById('venue-photo-preview');
+    const empty = document.getElementById('venue-photo-empty');
+
+    if (!input || !preview) return;
+
+    input.addEventListener('change', function () {
+        const file = this.files && this.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            this.value = '';
+            alert('Pilih file gambar JPG, PNG, atau WEBP.');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            this.value = '';
+            alert('Ukuran foto maksimal 5 MB.');
+            return;
+        }
+
+        preview.src = URL.createObjectURL(file);
+        preview.style.display = 'block';
+        if (empty) empty.style.display = 'none';
+    });
+});
+</script>
 
 @endsection

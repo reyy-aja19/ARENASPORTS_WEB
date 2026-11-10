@@ -1,6 +1,20 @@
 @extends('layouts.user')
 
 @section('content')
+<style>
+.om-page{position:relative}
+.om-page:before{content:"";position:fixed;right:-100px;top:160px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,#d8f4e2 0,rgba(216,244,226,0) 70%);pointer-events:none;z-index:-1}
+.om-page .u-panel{border-color:#dcece1;box-shadow:0 10px 28px rgba(13,81,55,.06)}
+.om-page .u-card{border-radius:18px;border-color:#dcece1;box-shadow:0 8px 22px rgba(13,81,55,.06);transition:transform .2s,box-shadow .2s}
+.om-page .u-card:hover{transform:translateY(-3px);box-shadow:0 14px 28px rgba(13,81,55,.11)}
+.om-detail{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:14px 0}
+.om-detail span{display:flex;gap:8px;align-items:flex-start;padding:10px;border-radius:10px;background:#f0f8f2;color:#526b5c;font-size:12px;line-height:1.45}
+.om-detail i{color:#168653;margin-top:2px}
+.om-joined{background:#e5e7eb!important;color:#6b7280!important;cursor:not-allowed!important}
+.om-full{background:#f3f4f6!important;color:#6b7280!important;cursor:not-allowed!important}
+@media(max-width:600px){.om-detail{grid-template-columns:1fr}}
+</style>
+<div class="om-page">
 
 {{-- EVENT ARENASPORTS --}}
 <div class="panel-card" style="margin-bottom:24px">
@@ -248,22 +262,39 @@
                     <p>{{ $match->deskripsi }}</p>
                 @endif
 
-                <form
-                    method="POST"
-                    action="{{ route('user.openmatches.join', $match) }}"
-                >
-                    @csrf
+                @php
+                    $currentUid = (int) (session('admin_user_id') ?? 0);
+                    $hostUid = (int) ($match->booking?->user_id ?? 0);
+                    $isMatchMember = $currentUid > 0 && ($hostUid === $currentUid || \Illuminate\Support\Facades\DB::table('open_match_participants')->where('open_match_id', $match->id)->where('user_id', $currentUid)->exists());
+                    $isFull = $match->status === 'Penuh' || $match->jumlah_bergabung >= $match->jumlah_pemain;
+                    $venueName = $match->booking?->lapangan?->venue?->name;
+                    $venueAddress = $match->booking?->lapangan?->venue?->address ?: $match->booking?->lapangan?->lokasi;
+                @endphp
+                <div class="om-detail">
+                    <span><i class="fa-solid fa-calendar-days"></i> {{ $match->tanggal?->format('d M Y') ?? 'Tanggal belum tersedia' }}</span>
+                    <span><i class="fa-regular fa-clock"></i> {{ $match->start_time }}–{{ $match->end_time }}</span>
+                    <span><i class="fa-solid fa-location-dot"></i> {{ $venueAddress ?: 'Lokasi belum tersedia' }}</span>
+                    <span><i class="fa-solid fa-building"></i> {{ $venueName ?: 'Venue belum terdaftar' }}</span>
+                    <span><i class="fa-solid fa-futbol"></i> {{ $match->jenis ?: 'Olahraga' }} · {{ $match->booking?->lapangan?->nama ?? 'Lapangan' }}</span>
+                    <span><i class="fa-solid fa-users"></i> {{ $match->jumlah_bergabung }}/{{ $match->jumlah_pemain }} pemain bergabung</span>
+                </div>
 
-                    <button
-                        type="submit"
-                        class="u-btn"
-                        {{ $match->jumlah_bergabung >= $match->jumlah_pemain ? 'disabled' : '' }}
-                    >
-                        {{ $match->jumlah_bergabung >= $match->jumlah_pemain
-                            ? 'Pemain Sudah Penuh'
-                            : 'Gabung Open Match' }}
-                    </button>
-                </form>
+                @if($isMatchMember)
+                    <button type="button" class="u-btn om-joined" disabled><i class="fa-solid fa-check"></i> Sudah Bergabung</button>
+                @elseif($isFull)
+                    <button type="button" class="u-btn om-full" disabled><i class="fa-solid fa-lock"></i> Pemain Sudah Penuh</button>
+                @else
+                    <form method="POST" action="{{ route('user.openmatches.join', $match) }}">
+                        @csrf
+                        <button type="submit" class="u-btn"><i class="fa-solid fa-user-plus"></i> Gabung Open Match</button>
+                    </form>
+                @endif
+
+                @if ($isMatchMember)
+                    <a href="{{ route('user.openmatches.chat', $match) }}" class="u-btn" style="display:inline-flex;margin-top:10px;text-decoration:none;background:#14532d">
+                        <i class="fa-solid fa-comments"></i> Obrolan Pemain
+                    </a>
+                @endif
 
             </div>
         </article>
@@ -349,4 +380,5 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+</div>
 @endsection

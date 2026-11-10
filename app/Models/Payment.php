@@ -11,6 +11,7 @@ class Payment extends Model
 
     protected $fillable = [
         'booking_id',
+        'booking_extension_id',
         'user_id',
         'method',
         'amount',
@@ -30,13 +31,24 @@ class Payment extends Model
         ];
     }
 
+    // Booking yang dibayar
     public function booking()
     {
         return $this->belongsTo(Booking::class);
     }
 
+    // Pemilik pembayaran
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    // Data perpanjangan jika pembayaran merupakan transaksi extension
+    public function extension()
+    {
+        return $this->belongsTo(
+            BookingExtension::class,
+            'booking_extension_id'
+        );
     }
 }

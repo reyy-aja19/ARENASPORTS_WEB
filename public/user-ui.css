@@ -117,3 +117,161 @@
 .as-security-note strong{font-size:14px}
 .as-security-note p{font-size:13px;line-height:1.55;margin:5px 0 0;color:#567264}
 @media(max-width:640px){.as-profile-heading{align-items:flex-start}.as-profile-photo{width:76px;height:76px;flex-basis:76px}}
+/* =========================================
+   AUTHENTICATION FIX - ARENASPORTS
+========================================= */
+
+body.u-login-page,
+body:has(> .u-auth) {
+    margin: 0;
+    min-height: 100vh;
+    background: #f5f9f6;
+    color: #172b23;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.u-auth {
+    min-height: 100vh;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.u-auth-hero {
+    min-width: 0;
+    padding: clamp(30px, 5vw, 76px);
+}
+
+.u-auth-form {
+    min-width: 0;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.u-auth-card {
+    width: 100%;
+    max-width: 430px;
+    padding: 28px;
+    margin: auto;
+}
+
+.u-auth-card h2 {
+    font-family: 'Manrope', sans-serif;
+    line-height: 1.25;
+}
+
+.u-auth-card > p {
+    line-height: 1.6;
+}
+
+.u-auth-card .u-field {
+    margin: 14px 0;
+}
+
+.u-auth-card .u-field label {
+    margin-bottom: 7px;
+}
+
+.u-auth-card input {
+    font-family: 'DM Sans', sans-serif;
+}
+
+.u-login-subtitle {
+    margin-bottom: 18px !important;
+}
+
+.u-auth-card .u-login-submit {
+    margin-top: 5px;
+}
+
+.u-login-divider {
+    margin: 16px 0;
+}
+
+.u-google-login {
+    min-height: 46px;
+    margin-bottom: 8px;
+    transition: background .2s ease;
+}
+
+.u-register-prompt {
+    margin: 15px 0 !important;
+}
+
+.u-login-security {
+    padding: 10px;
+}
+
+.u-login-admin-note {
+    line-height: 1.5;
+}
+
+@media (max-width: 850px) {
+    .u-auth {
+        grid-template-columns: 1fr;
+    }
+
+    .u-auth-hero {
+        min-height: 280px;
+    }
+
+    .u-auth-form {
+        padding: 28px 20px;
+    }
+
+    .u-auth-card {
+        max-width: 480px;
+    }
+}
+
+@media (max-width: 560px) {
+    .u-auth-hero {
+        min-height: 250px;
+        padding: 25px;
+    }
+
+    .u-auth-form {
+        padding: 20px 14px;
+    }
+
+    .u-auth-card {
+        padding: 23px 19px;
+        border-radius: 18px;
+    }
+}
+
+/* FIX LOGO AUTH */
+.u-auth-hero .u-brand {
+    color: #ffffff !important;
+    text-decoration: none;
+}
+
+.u-auth-hero .u-brand > span:last-child {
+    color: #ffffff !important;
+}
+
+.u-auth-hero .u-brand > span:last-child > span {
+    color: #a5efbf !important;
+}
+
+.u-auth-hero .u-brand small {
+    color: #c7e7d3 !important;
+}
+/* ArenaSports visual polish: photo cards and subtle green ornaments */
+.u-main{position:relative;isolation:isolate}
+.u-main:before{content:"";position:absolute;z-index:-1;pointer-events:none;top:30px;right:-110px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(190,239,205,.42),rgba(190,239,205,0) 72%)}
+.u-main:after{content:"";position:absolute;z-index:-1;pointer-events:none;left:-130px;top:520px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(220,246,228,.5),rgba(220,246,228,0) 72%)}
+.u-card{box-shadow:0 7px 20px rgba(13,81,55,.055);transition:transform .22s ease,box-shadow .22s ease}
+.u-card:hover{transform:translateY(-3px);box-shadow:0 13px 28px rgba(13,81,55,.11)}
+.u-card-img{height:190px;position:relative;display:block;overflow:hidden;background:linear-gradient(135deg,#e1f5e7,#bde8cc);border-bottom:1px solid #e4f0e7}
+.u-card-img img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 48%;transition:transform .35s ease}
+.u-card:hover .u-card-img img{transform:scale(1.035)}
+.u-card-body{position:relative;background:linear-gradient(145deg,#fff 75%,#f0faf3);padding:19px}
+.u-card-body:after{content:"";position:absolute;right:-25px;bottom:-40px;width:125px;height:125px;border:14px solid rgba(23,134,83,.045);border-radius:50%;pointer-events:none}
+.u-card-body>*{position:relative;z-index:1}
+
+/* Keep venue photo and venue information in separate, clean card sections */
+.u-card{display:flex;flex-direction:column;min-height:100%}
+.u-card-img{flex:0 0 190px;width:100%;height:190px;min-height:190px}
+.u-card-body{display:block;position:relative;z-index:1;clear:both;flex:1 1 auto;background:#fff}
+.u-card-body:after{z-index:0}
