@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -14,6 +15,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+
+    {{-- Cloudflare Turnstile CAPTCHA --}}
+    <script
+        src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+        async
+        defer>
+    </script>
 
     <style>
         .u-register-card .u-field {
@@ -151,6 +159,7 @@
                 Buat akun dan mulai pengalaman olahraga yang lebih mudah.
             </p>
 
+            {{-- Pesan error --}}
             @if(session('error'))
                 <div class="u-alert error">
                     <i class="fa-solid fa-circle-exclamation"></i>
@@ -158,6 +167,7 @@
                 </div>
             @endif
 
+            {{-- Pesan berhasil --}}
             @if(session('success'))
                 <div class="u-alert success">
                     <i class="fa-solid fa-circle-check"></i>
@@ -165,7 +175,16 @@
                 </div>
             @endif
 
-            @if($errors->any())
+            {{-- Pesan error CAPTCHA --}}
+            @if($errors->has('captcha'))
+                <div class="u-alert error">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    {{ $errors->first('captcha') }}
+                </div>
+            @endif
+
+            {{-- Pesan error validasi lainnya --}}
+            @if($errors->any() && !$errors->has('captcha'))
                 <div class="u-alert error">
                     <i class="fa-solid fa-circle-exclamation"></i>
                     {{ $errors->first() }}
@@ -175,6 +194,7 @@
             <form method="POST" action="{{ route('register.submit') }}">
                 @csrf
 
+                {{-- Nama lengkap --}}
                 <div class="u-field">
                     <label for="name">Nama lengkap</label>
 
@@ -189,6 +209,7 @@
                     >
                 </div>
 
+                {{-- Email --}}
                 <div class="u-field">
                     <label for="email">Alamat email</label>
 
@@ -203,6 +224,7 @@
                     >
                 </div>
 
+                {{-- Nomor HP --}}
                 <div class="u-field">
                     <label for="phone">Nomor HP (opsional)</label>
 
@@ -216,6 +238,7 @@
                     >
                 </div>
 
+                {{-- Password --}}
                 <div class="u-field">
                     <label for="password">
                         Password (minimal 8 karakter)
@@ -232,6 +255,7 @@
                     >
                 </div>
 
+                {{-- Konfirmasi password --}}
                 <div class="u-field">
                     <label for="password_confirmation">
                         Konfirmasi password
@@ -248,10 +272,19 @@
                     >
                 </div>
 
+                {{-- Cloudflare Turnstile CAPTCHA --}}
+                <div style="display:flex; justify-content:center; margin:18px 0;">
+                    <div
+                        class="cf-turnstile"
+                        data-sitekey="{{ config('services.turnstile.site_key') }}"
+                        data-theme="light">
+                    </div>
+                </div>
+
+                {{-- Tombol daftar --}}
                 <button
                     class="u-btn u-register-submit"
-                    type="submit"
-                >
+                    type="submit">
                     Buat akun ArenaSports
                     <i class="fa-solid fa-arrow-right"></i>
                 </button>
@@ -264,11 +297,13 @@
 
             <div class="u-register-options">
 
+                {{-- Daftar Google --}}
                 <a href="{{ route('auth.google.redirect') }}">
                     <i class="fa-brands fa-google"></i>
                     Daftar dengan Google
                 </a>
 
+                {{-- Daftar WhatsApp --}}
                 <a href="{{ route('phone.register') }}">
                     <i class="fa-brands fa-whatsapp"></i>
                     Daftar dengan WhatsApp

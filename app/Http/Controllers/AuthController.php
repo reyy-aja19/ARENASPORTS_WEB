@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Notifications\AccountActivityNotification;
 use App\Services\FonnteWhatsAppService;
+use App\Services\TurnstileService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Cache;
@@ -24,34 +25,56 @@ class AuthController extends Controller
         return view('auth.login');
     }
 
-    public function login(Request $request)
-    {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
-            'password' => ['required'],
-        ]);
-
-        $user = User::where('email', $credentials['email'])->first();
-
-        if (!$user || !$user->password || !Hash::check($credentials['password'], $user->password)) {
-            return back()->withInput($request->only('email'))->with('error', 'Email atau password salah.');
-        }
-
-        if ($user->status !== 'Aktif') {
-            return back()->withInput($request->only('email'))->with('error', 'Akun sedang nonaktif. Hubungi pengelola.');
-        }
-
-        $request->session()->regenerate();
-        $request->session()->put([
-            'admin_logged_in' => true,
-            'admin_user_id' => $user->id,
-            'admin_role' => $user->role,
-        ]);
-
-        $this->sendAccountActivity($user, 'Login berhasil', 'Akun ArenaSports kamu baru saja digunakan untuk login.', 'Email dan password');
-
-        return $this->redirectAfterLogin($request);
+    
+public function login(Request $request, TurnstileService $turnstile)
+{
+    // Verifikasi CAPTCHA sebelum memeriksa kredensial.
+    if (!$turnstile->verify(
+        $request->input('cf-turnstile-response'),
+        $request->ip()
+    )) {
+        return back()
+            ->withInput($request->only('email'))
+            ->withErrors([
+                'captcha' => 'Verifikasi CAPTCHA gagal. Silakan coba lagi.',
+            ]);
     }
+
+    $credentials = $request->validate([
+        'email' => ['required', 'email'],
+        'password' => ['required'],
+    ]);
+
+    $user = User::where('email', $credentials['email'])->first();
+
+    if (!$user || !$user->password || !Hash::check($credentials['password'], $user->password)) {
+        return back()->withInput($request->only('email'))
+            ->with('error', 'Email atau password salah.');
+    }
+
+    if ($user->status !== 'Aktif') {
+        return back()->withInput($request->only('email'))
+            ->with('error', 'Akun sedang nonaktif. Hubungi pengelola.');
+    }
+
+    $request->session()->regenerate();
+
+    $request->session()->put([
+        'admin_logged_in' => true,
+        'admin_user_id' => $user->id,
+        'admin_role' => $user->role,
+    ]);
+
+    $this->sendAccountActivity(
+        $user,
+        'Login berhasil',
+        'Akun ArenaSports kamu baru saja digunakan untuk login.',
+        'Email dan password'
+    );
+
+    return $this->redirectAfterLogin($request);
+}
+
 
     public function showRegister(Request $request)
     {
@@ -62,42 +85,83 @@ class AuthController extends Controller
         return view('auth.register');
     }
 
-    public function register(Request $request)
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:50'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ]);
-
-        $phone = !empty($data['phone']) ? app(FonnteWhatsAppService::class)->normalizeNumber($data['phone']) : null;
-        if ($phone && User::where('phone', $phone)->exists()) {
-            return back()->withInput($request->except('password', 'password_confirmation'))
-                ->withErrors(['phone' => 'Nomor WhatsApp sudah digunakan akun lain.']);
-        }
-
-        $user = User::create([
-            'name' => $data['name'],
-            'email' => $data['email'],
-            'phone' => $phone,
-            'password' => Hash::make($data['password']),
-            'role' => 'user',
-            'status' => 'Aktif',
-            'points' => 0,
-        ]);
-
-        $request->session()->regenerate();
-        $request->session()->put([
-            'admin_logged_in' => true,
-            'admin_user_id' => $user->id,
-            'admin_role' => 'user',
-        ]);
-
-        $this->sendAccountActivity($user, 'Pendaftaran berhasil', 'Akun ArenaSports kamu berhasil didaftarkan.', 'Email dan password');
-
-        return $this->redirectAfterLogin($request)->with('success', 'Akun berhasil dibuat. Selamat datang di ARENASPORTS!');
+    
+public function register(Request $request, TurnstileService $turnstile)
+{
+    // 1. Verifikasi Cloudflare Turnstile CAPTCHA
+    if (!$turnstile->verify(
+        $request->input('cf-turnstile-response'),
+        $request->ip()
+    )) {
+        return back()
+            ->withInput($request->except([
+                'password',
+                'password_confirmation',
+                'cf-turnstile-response',
+            ]))
+            ->withErrors([
+                'captcha' => 'Verifikasi CAPTCHA gagal. Silakan coba lagi.',
+            ]);
     }
+
+    // 2. Validasi data registrasi
+    $data = $request->validate([
+        'name' => ['required', 'string', 'max:255'],
+        'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+        'phone' => ['nullable', 'string', 'max:50'],
+        'password' => ['required', 'string', 'min:8', 'confirmed'],
+    ]);
+
+    // 3. Normalisasi nomor HP
+    $phone = !empty($data['phone'])
+        ? app(FonnteWhatsAppService::class)->normalizeNumber($data['phone'])
+        : null;
+
+    // 4. Periksa apakah nomor HP sudah digunakan
+    if ($phone && User::where('phone', $phone)->exists()) {
+        return back()
+            ->withInput($request->except([
+                'password',
+                'password_confirmation',
+            ]))
+            ->withErrors([
+                'phone' => 'Nomor WhatsApp sudah digunakan akun lain.',
+            ]);
+    }
+
+    // 5. Buat akun pengguna
+    $user = User::create([
+        'name' => $data['name'],
+        'email' => $data['email'],
+        'phone' => $phone,
+        'password' => Hash::make($data['password']),
+        'role' => 'user',
+        'status' => 'Aktif',
+        'points' => 0,
+    ]);
+
+    // 6. Regenerasi session
+    $request->session()->regenerate();
+
+    $request->session()->put([
+        'admin_logged_in' => true,
+        'admin_user_id' => $user->id,
+        'admin_role' => 'user',
+    ]);
+
+    // 7. Kirim notifikasi aktivitas akun
+    $this->sendAccountActivity(
+        $user,
+        'Pendaftaran berhasil',
+        'Akun ArenaSports kamu berhasil didaftarkan.',
+        'Email dan password'
+    );
+
+    // 8. Arahkan pengguna setelah registrasi
+    return $this->redirectAfterLogin($request)
+        ->with('success', 'Akun berhasil dibuat. Selamat datang di ARENASPORTS!');
+}
+
 
     public function redirectToGoogle()
     {
@@ -181,45 +245,117 @@ class AuthController extends Controller
         return view('auth.phone', ['mode' => 'register']);
     }
 
-    public function sendPhoneLoginOtp(Request $request, FonnteWhatsAppService $whatsapp)
-    {
-        $data = $request->validate(['phone' => ['required', 'string', 'max:50']]);
-        $phone = $whatsapp->normalizeNumber($data['phone']);
-        if (strlen($phone) < 10 || strlen($phone) > 15) {
-            return back()->withInput()->withErrors(['phone' => 'Format nomor WhatsApp tidak valid. Gunakan nomor aktif, misalnya 081234567890.']);
-        }
-
-        $phoneMatches = User::where('phone', $phone)->where('role', 'user')->get();
-        if ($phoneMatches->count() > 1) {
-            return back()->withInput()->withErrors(['phone' => 'Nomor ini terhubung ke lebih dari satu akun. Hubungi admin untuk memperbaiki data nomor.']);
-        }
-        $user = $phoneMatches->first();
-
-        if (!$user || $user->status !== 'Aktif') {
-            return back()->withInput()->withErrors(['phone' => 'Nomor WhatsApp belum terdaftar atau akun tidak aktif.']);
-        }
-
-        return $this->issuePhoneOtp($request, $whatsapp, $phone, 'login', null);
+    
+public function sendPhoneLoginOtp(
+    Request $request,
+    FonnteWhatsAppService $whatsapp,
+    TurnstileService $turnstile
+) {
+    // 1. Verifikasi Cloudflare Turnstile
+    if (!$turnstile->verify(
+        $request->input('cf-turnstile-response'),
+        $request->ip()
+    )) {
+        return back()
+            ->withInput($request->except('cf-turnstile-response'))
+            ->withErrors([
+                'captcha' => 'Verifikasi CAPTCHA gagal. Silakan coba lagi.',
+            ]);
     }
 
-    public function sendPhoneRegisterOtp(Request $request, FonnteWhatsAppService $whatsapp)
-    {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'max:50'],
+    // 2. Validasi nomor WhatsApp
+    $data = $request->validate([
+        'phone' => ['required', 'string', 'max:50'],
+    ]);
+
+    // 3. Normalisasi nomor
+    $phone = $whatsapp->normalizeNumber($data['phone']);
+
+    if (strlen($phone) < 10 || strlen($phone) > 15) {
+        return back()->withInput()->withErrors([
+            'phone' => 'Format nomor WhatsApp tidak valid. Gunakan nomor aktif, misalnya 081234567890.',
         ]);
-        $phone = $whatsapp->normalizeNumber($data['phone']);
-
-        if (strlen($phone) < 10 || strlen($phone) > 15) {
-            return back()->withInput()->withErrors(['phone' => 'Format nomor WhatsApp tidak valid. Gunakan nomor aktif, misalnya 081234567890.']);
-        }
-
-        if (User::where('phone', $phone)->exists()) {
-            return back()->withInput()->withErrors(['phone' => 'Nomor WhatsApp sudah terdaftar. Silakan login.']);
-        }
-
-        return $this->issuePhoneOtp($request, $whatsapp, $phone, 'register', $data['name']);
     }
+
+    // 4. Periksa akun berdasarkan nomor WhatsApp
+    $phoneMatches = User::where('phone', $phone)
+        ->where('role', 'user')
+        ->get();
+
+    if ($phoneMatches->count() > 1) {
+        return back()->withInput()->withErrors([
+            'phone' => 'Nomor ini terhubung ke lebih dari satu akun. Hubungi admin untuk memperbaiki data nomor.',
+        ]);
+    }
+
+    $user = $phoneMatches->first();
+
+    if (!$user || $user->status !== 'Aktif') {
+        return back()->withInput()->withErrors([
+            'phone' => 'Nomor WhatsApp belum terdaftar atau akun tidak aktif.',
+        ]);
+    }
+
+    // 5. Kirim OTP
+    return $this->issuePhoneOtp(
+        $request,
+        $whatsapp,
+        $phone,
+        'login',
+        null
+    );
+}
+
+
+   
+public function sendPhoneRegisterOtp(
+    Request $request,
+    FonnteWhatsAppService $whatsapp,
+    TurnstileService $turnstile
+) {
+    // 1. Verifikasi Cloudflare Turnstile
+    if (!$turnstile->verify(
+        $request->input('cf-turnstile-response'),
+        $request->ip()
+    )) {
+        return back()
+            ->withInput($request->except('cf-turnstile-response'))
+            ->withErrors([
+                'captcha' => 'Verifikasi CAPTCHA gagal. Silakan coba lagi.',
+            ]);
+    }
+
+    // 2. Validasi nama dan nomor WhatsApp
+    $data = $request->validate([
+        'name' => ['required', 'string', 'max:255'],
+        'phone' => ['required', 'string', 'max:50'],
+    ]);
+
+    // 3. Normalisasi nomor WhatsApp
+    $phone = $whatsapp->normalizeNumber($data['phone']);
+
+    if (strlen($phone) < 10 || strlen($phone) > 15) {
+        return back()->withInput()->withErrors([
+            'phone' => 'Format nomor WhatsApp tidak valid. Gunakan nomor aktif, misalnya 081234567890.',
+        ]);
+    }
+
+    // 4. Periksa apakah nomor sudah terdaftar
+    if (User::where('phone', $phone)->exists()) {
+        return back()->withInput()->withErrors([
+            'phone' => 'Nomor WhatsApp sudah terdaftar. Silakan login.',
+        ]);
+    }
+
+    // 5. Kirim OTP untuk registrasi
+    return $this->issuePhoneOtp(
+        $request,
+        $whatsapp,
+        $phone,
+        'register',
+        $data['name']
+    );
+}
 
     private function issuePhoneOtp(Request $request, FonnteWhatsAppService $whatsapp, string $phone, string $purpose, ?string $name)
     {

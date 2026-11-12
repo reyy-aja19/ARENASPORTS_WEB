@@ -39,6 +39,17 @@ class DatabaseSeeder extends Seeder
                 'status' => 'Aktif',
             ]
         );
+        User::updateOrCreate(
+    ['email' => 'trivaldo2345@gmail.com'],
+    [
+        'name' => 'Trivaldo',
+        'password' => Hash::make('12345678'),
+        'role' => 'venue_admin',
+        'phone' => '081234567895',
+        'points' => 0,
+        'status' => 'Aktif',
+    ]
+);
 
         $users = collect([
             ['name' => 'Restu', 'email' => 'restu@gmail.com', 'phone' => '0811111111', 'points' => 10, 'status' => 'Aktif'],
@@ -46,6 +57,13 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Wendi', 'email' => 'wendi@gmail.com', 'phone' => '0833333333', 'points' => 5, 'status' => 'Aktif'],
             ['name' => 'Furab', 'email' => 'furab@gmail.com', 'phone' => '0844444444', 'points' => 7, 'status' => 'Aktif'],
             ['name' => 'AdiBurger', 'email' => 'adiburger@gmail.com', 'phone' => '0855555555', 'points' => 25, 'status' => 'Nonaktif'],
+            [
+    'name' => 'Restu',
+    'email' => 'restu112345@gmail.com',
+    'phone' => '081234567896',
+    'points' => 10,
+    'status' => 'Aktif',
+],
         ])->map(fn ($u) => User::updateOrCreate(
             ['email' => $u['email']],
             array_merge($u, ['password' => Hash::make('password123'), 'role' => 'user'])

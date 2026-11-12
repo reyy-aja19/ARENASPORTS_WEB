@@ -13,6 +13,34 @@
     $isRevision = $application &&
         in_array($application->status, $revisionStatuses, true);
 
+    $existingDocuments = $application?->documents ?? collect();
+
+    $hasIdentityDocument = $isRevision &&
+        $existingDocuments->contains('document_type', 'Identitas Pemohon');
+
+    $hasOwnershipDocument = $isRevision &&
+        $existingDocuments->contains('document_type', 'Bukti Kepemilikan');
+
+    $hasLeaseDocument = $isRevision &&
+        $existingDocuments->contains('document_type', 'Perjanjian Sewa');
+
+    $hasAuthorizationDocument = $isRevision &&
+        $existingDocuments->contains('document_type', 'Surat Kuasa/Penunjukan');
+
+    $hasExteriorPhoto = $isRevision &&
+        $existingDocuments->contains('document_type', 'Foto Tampak Depan');
+
+    $hasInteriorPhoto = $isRevision &&
+        $existingDocuments->contains('document_type', 'Foto Bagian Dalam');
+
+    $hasCourtPhotos = $isRevision &&
+        $existingDocuments->contains('document_type', 'Foto Fasilitas Lapangan');
+
+    $selectedOwnership = old(
+        'ownership_type',
+        $application->ownership_type ?? ''
+    );
+
     $facilityValues = old('facilities', $application->facilities ?? [
         'Parkir motor',
         'Parkir mobil',
@@ -149,6 +177,42 @@
         color:#dc2626;
     }
 
+    .va-existing-docs{
+        background:#f8fafc;
+        border:1px solid #e2e8f0;
+        border-radius:10px;
+        padding:12px 15px;
+        margin-bottom:15px;
+    }
+
+    .va-existing-docs ul{
+        margin:8px 0 0 18px;
+        padding:0;
+    }
+
+    .va-existing-docs li{
+        margin-bottom:5px;
+        font-size:12px;
+        color:#475569;
+    }
+
+    .va-terms{
+        display:flex;
+        align-items:flex-start;
+        gap:10px;
+        margin-top:16px;
+        font-size:13px;
+        line-height:1.6;
+        color:#334155;
+    }
+
+    .va-terms input{
+        width:17px;
+        height:17px;
+        flex-shrink:0;
+        margin-top:2px;
+    }
+
     @media(max-width:650px){
         .va-grid,.va-docs{grid-template-columns:1fr}
         .va-card{padding:16px}
@@ -214,10 +278,23 @@
             @endif
 
             @if($application->documents->isNotEmpty())
-                <p class="va-muted">
-                    Dokumen yang sudah dikirim:
-                    {{ $application->documents->count() }} berkas.
-                </p>
+                <div class="va-existing-docs">
+                    <strong>Dokumen yang sudah tersimpan:</strong>
+                    <ul>
+                        @foreach($application->documents as $document)
+                            <li>
+                                {{ $document->document_type }} —
+                                {{ $document->original_name }}
+                            </li>
+                        @endforeach
+                    </ul>
+                    @if($isRevision)
+                        <small>
+                            Dokumen yang sudah tersimpan dapat digunakan kembali.
+                            Unggah dokumen baru hanya jika ingin menggantinya atau menambah foto.
+                        </small>
+                    @endif
+                </div>
             @endif
 
             @if($application->histories->isNotEmpty())
@@ -278,6 +355,68 @@
 
                     <div class="va-field">
                         <label>
+                            Hubungan pemohon dengan usaha
+                            <span class="va-required-note">*</span>
+                        </label>
+
+                        <select
+                            name="applicant_relationship"
+                            id="applicant-relationship"
+                            data-has-existing="{{ $hasAuthorizationDocument ? '1' : '0' }}"
+                            required
+                        >
+                            <option value="">Pilih hubungan dengan usaha</option>
+
+                            <option
+                                value="owner"
+                                @selected(old('applicant_relationship', $application->applicant_relationship ?? '') === 'owner')
+                            >
+                                Pemilik usaha
+                            </option>
+
+                            <option
+                                value="manager"
+                                @selected(old('applicant_relationship', $application->applicant_relationship ?? '') === 'manager')
+                            >
+                                Pengelola usaha
+                            </option>
+
+                            <option
+                                value="representative"
+                                @selected(old('applicant_relationship', $application->applicant_relationship ?? '') === 'representative')
+                            >
+                                Perwakilan pemilik usaha
+                            </option>
+                        </select>
+
+                        <small>
+                            Jika kamu bukan pemilik usaha, lampirkan surat kuasa atau surat penunjukan.
+                        </small>
+                    </div>
+
+                    <div class="va-field full" id="authorization-field">
+                        <label>
+                            Surat kuasa atau surat penunjukan
+                            <span class="va-required-note" id="authorization-required">*</span>
+                        </label>
+
+                        <input
+                            type="file"
+                            name="authorization_document"
+                            id="authorization-document"
+                            class="js-scan-input"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            data-has-existing="{{ $hasAuthorizationDocument ? '1' : '0' }}"
+                        >
+
+                        <small id="authorization-help">
+                            Wajib untuk pengelola atau perwakilan usaha.
+                            PDF, JPG, atau PNG. Maksimal 5 MB.
+                        </small>
+                    </div>
+
+                    <div class="va-field">
+                        <label>
                             Foto KTP atau identitas resmi
                             <span class="va-required-note">*</span>
                         </label>
@@ -287,12 +426,12 @@
                             name="identity_document"
                             class="js-scan-input"
                             accept=".pdf,.jpg,.jpeg,.png"
-                            @if(!$isRevision) required @endif
+                            @if(!$hasIdentityDocument) required @endif
                         >
 
                         <small>
                             PDF, JPG, atau PNG. Maksimal 5 MB.
-                            @if($isRevision)
+                            @if($hasIdentityDocument)
                                 Kosongkan jika tidak ingin mengganti dokumen sebelumnya.
                             @endif
                         </small>
@@ -510,12 +649,14 @@
                                         type="checkbox"
                                         name="sports[]"
                                         value="{{ $sport }}"
-                                        @checked(in_array($sport, $sportsValues))
+                                        @checked(in_array($sport, $sportsValues, true))
                                     >
                                     {{ $sport }}
                                 </label>
                             @endforeach
                         </div>
+
+                        <small>Pilih minimal satu jenis olahraga.</small>
                     </div>
 
                     {{-- FASILITAS DINAMIS --}}
@@ -586,14 +727,14 @@
 
                             <option
                                 value="Milik Sendiri"
-                                @selected(old('ownership_type', $application->ownership_type ?? '') === 'Milik Sendiri')
+                                @selected($selectedOwnership === 'Milik Sendiri')
                             >
                                 Milik sendiri
                             </option>
 
                             <option
                                 value="Sewa"
-                                @selected(old('ownership_type', $application->ownership_type ?? '') === 'Sewa')
+                                @selected($selectedOwnership === 'Sewa')
                             >
                                 Tempat sewa
                             </option>
@@ -611,6 +752,7 @@
                             id="ownership-document"
                             class="js-scan-input"
                             accept=".pdf,.jpg,.jpeg,.png"
+                            data-has-existing="{{ $hasOwnershipDocument ? '1' : '0' }}"
                         >
 
                         <small id="ownership-help">
@@ -627,9 +769,10 @@
                             id="lease-document"
                             class="js-scan-input"
                             accept=".pdf,.jpg,.jpeg,.png"
+                            data-has-existing="{{ $hasLeaseDocument ? '1' : '0' }}"
                         >
 
-                        <small>
+                        <small id="lease-help">
                             Wajib jika status tempat adalah sewa.
                             Jika milik sendiri, bagian ini tidak perlu diisi.
                         </small>
@@ -671,10 +814,15 @@
                             name="venue_exterior_photo"
                             class="js-scan-input"
                             accept="image/jpeg,image/png,image/webp"
-                            @if(!$isRevision) required @endif
+                            @if(!$hasExteriorPhoto) required @endif
                         >
 
-                        <small>Foto papan nama atau tampak depan lokasi. Maksimal 5 MB.</small>
+                        <small>
+                            Foto papan nama atau tampak depan lokasi. Maksimal 5 MB.
+                            @if($hasExteriorPhoto)
+                                Kosongkan jika foto sebelumnya masih berlaku.
+                            @endif
+                        </small>
                     </div>
 
                     <div class="va-field">
@@ -688,10 +836,15 @@
                             name="venue_interior_photo"
                             class="js-scan-input"
                             accept="image/jpeg,image/png,image/webp"
-                            @if(!$isRevision) required @endif
+                            @if(!$hasInteriorPhoto) required @endif
                         >
 
-                        <small>Foto area utama di dalam tempat olahraga. Maksimal 5 MB.</small>
+                        <small>
+                            Foto area utama di dalam tempat olahraga. Maksimal 5 MB.
+                            @if($hasInteriorPhoto)
+                                Kosongkan jika foto sebelumnya masih berlaku.
+                            @endif
+                        </small>
                     </div>
 
                     <div class="va-field full">
@@ -706,28 +859,53 @@
                             class="js-scan-input"
                             accept="image/jpeg,image/png,image/webp"
                             multiple
-                            @if(!$isRevision) required @endif
+                            @if(!$hasCourtPhotos) required @endif
                         >
 
                         <small>
                             Unggah minimal satu foto dan maksimal delapan foto.
                             Setiap file maksimal 5 MB.
+                            @if($hasCourtPhotos)
+                                Kosongkan jika foto sebelumnya masih berlaku.
+                            @endif
                         </small>
                     </div>
 
                 </div>
             </section>
 
-            {{-- PERNYATAAN DAN SUBMIT --}}
+            {{-- 6. PERNYATAAN TANGGUNG JAWAB --}}
             <section class="va-card">
 
+                <h3 class="va-section-title">6. Pernyataan dan Persetujuan</h3>
+
                 <p class="va-muted" style="font-size:13px">
-                    Dengan mengirim pengajuan, pemohon menyatakan bahwa informasi
-                    dan dokumen yang diberikan benar serta dapat dipertanggungjawabkan.
-                    Dokumen akan digunakan untuk proses verifikasi ArenaSports.
+                    Dengan mengirim pengajuan, pemohon menyatakan bahwa:
                 </p>
 
-                <button type="submit" class="u-btn" style="width:100%">
+                <ul class="va-muted" style="font-size:13px;line-height:1.8;padding-left:20px">
+                    <li>Seluruh informasi dan dokumen yang diberikan adalah benar dan dapat dipertanggungjawabkan.</li>
+                    <li>Pemohon memiliki hak atau izin yang sah untuk mengajukan pengelolaan venue tersebut.</li>
+                    <li>Pemohon bersedia bertanggung jawab atas keabsahan dokumen dan informasi yang disampaikan.</li>
+                    <li>Pemohon memahami bahwa Superadmin berhak memeriksa, meminta revisi, atau menolak pengajuan.</li>
+                </ul>
+
+                <label class="va-terms">
+                    <input
+                        type="checkbox"
+                        name="accepted_terms"
+                        value="1"
+                        @checked(old('accepted_terms'))
+                        required
+                    >
+
+                    <span>
+                        Saya telah membaca, memahami, dan menyetujui seluruh pernyataan tanggung jawab di atas.
+                        <span class="va-required-note">*</span>
+                    </span>
+                </label>
+
+                <button type="submit" class="u-btn" style="width:100%;margin-top:20px">
                     {{ $isRevision ? 'Kirim Ulang Pengajuan Setelah Revisi' : 'Kirim Pengajuan untuk Diverifikasi' }}
                 </button>
 
@@ -768,6 +946,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const lease = document.getElementById('lease-document');
     const label = document.getElementById('ownership-label');
     const help = document.getElementById('ownership-help');
+    const leaseHelp = document.getElementById('lease-help');
 
     function updateOwnershipFields() {
 
@@ -776,11 +955,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const isOwn = type.value === 'Milik Sendiri';
         const isRent = type.value === 'Sewa';
 
-        ownership.required = isOwn;
-        lease.required = isRent;
+        const hasOwnership = ownership.dataset.hasExisting === '1';
+        const hasLease = lease.dataset.hasExisting === '1';
 
-        ownership.disabled = isRent;
-        lease.disabled = isOwn;
+        ownership.required = isOwn && !hasOwnership;
+        lease.required = isRent && !hasLease;
+
+        ownership.disabled = !isOwn;
+        lease.disabled = !isRent;
 
         if (label) {
             label.textContent = isOwn
@@ -790,16 +972,71 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (help) {
             help.textContent = isOwn
-                ? 'Unggah sertifikat, bukti kepemilikan, atau dokumen sah lain. Maksimal 5 MB.'
-                : isRent
-                    ? 'Tempat sewa menggunakan surat perjanjian sewa pada kolom berikutnya.'
-                    : 'Pilih status tempat terlebih dahulu.';
+                ? (hasOwnership
+                    ? 'Dokumen kepemilikan sebelumnya sudah tersimpan. Unggah hanya jika ingin menambahkan dokumen baru.'
+                    : 'Unggah sertifikat, bukti kepemilikan, atau dokumen sah lain. Maksimal 5 MB.')
+                : 'Pilih status tempat milik sendiri untuk mengisi bagian ini.';
+        }
+
+        if (leaseHelp) {
+            leaseHelp.textContent = isRent
+                ? (hasLease
+                    ? 'Perjanjian sewa sebelumnya sudah tersimpan. Unggah hanya jika ingin menambahkan dokumen baru.'
+                    : 'Wajib untuk tempat sewa. Maksimal 5 MB.')
+                : 'Pilih status tempat sewa untuk mengisi bagian ini.';
         }
     }
 
     if (type) {
         type.addEventListener('change', updateOwnershipFields);
         updateOwnershipFields();
+    }
+
+
+    /* ==================================
+       SURAT KUASA / PENUNJUKAN
+    ================================== */
+
+    const relationship = document.getElementById('applicant-relationship');
+    const authorization = document.getElementById('authorization-document');
+    const authorizationField = document.getElementById('authorization-field');
+    const authorizationRequired = document.getElementById('authorization-required');
+    const authorizationHelp = document.getElementById('authorization-help');
+
+    function updateAuthorizationField() {
+
+        if (!relationship || !authorization) return;
+
+        const needsAuthorization = [
+            'manager',
+            'representative'
+        ].includes(relationship.value);
+
+        const hasExisting = authorization.dataset.hasExisting === '1';
+
+        authorization.disabled = !needsAuthorization;
+        authorization.required = needsAuthorization && !hasExisting;
+
+        if (authorizationField) {
+            authorizationField.style.opacity = needsAuthorization ? '1' : '0.75';
+        }
+
+        if (authorizationRequired) {
+            authorizationRequired.style.display = needsAuthorization ? 'inline' : 'none';
+        }
+
+        if (authorizationHelp) {
+            authorizationHelp.textContent = !needsAuthorization
+                ? 'Dokumen ini tidak diperlukan jika pemohon merupakan pemilik usaha.'
+                : hasExisting
+                    ? 'Surat kuasa atau penunjukan sebelumnya sudah tersimpan. Unggah dokumen baru jika ingin menggantinya atau menambahkan dokumen.'
+                    : 'Wajib untuk pengelola atau perwakilan usaha. PDF, JPG, atau PNG. Maksimal 5 MB.';
+        }
+    }
+
+    if (relationship) {
+        relationship.addEventListener('change', updateAuthorizationField);
+        updateAuthorizationField();
     }
 
 

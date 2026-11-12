@@ -226,117 +226,284 @@ class MarketplaceController extends Controller
         return view('user.venue-application', compact('user', 'application'));
     }
 
-    public function applicationStore(Request $request)
-    {
-        $user = $this->user($request);
-        abort_unless(in_array($user->role, ['user', 'venue_admin'], true), 403);
+   
+public function applicationStore(Request $request)
+{
+    $user = $this->user($request);
 
-        $activeApplication = $user->venueApplications()
-            ->whereIn('status', ['pending', 'revision', 'Menunggu', 'Perlu Revisi'])
-            ->latest()->first();
-        if ($activeApplication && $activeApplication->status !== 'revision' && $activeApplication->status !== 'Perlu Revisi') {
-            return back()->with('error', 'Pengajuan masih menunggu pemeriksaan Superadmin.');
+    abort_unless(
+        in_array($user->role, ['user', 'venue_admin'], true),
+        403
+    );
+
+    $activeApplication = $user->venueApplications()
+        ->whereIn('status', [
+            'pending',
+            'revision',
+            'Menunggu',
+            'Perlu Revisi'
+        ])
+        ->latest()
+        ->first();
+
+    $isRevision = $activeApplication && in_array(
+        $activeApplication->status,
+        ['revision', 'Perlu Revisi'],
+        true
+    );
+
+    if ($activeApplication && !$isRevision) {
+        return back()->with(
+            'error',
+            'Pengajuan masih menunggu pemeriksaan Superadmin.'
+        );
+    }
+
+    // Memeriksa apakah dokumen lama masih tersedia.
+    $hasDocument = function (string $documentType) use ($activeApplication) {
+        if (!$activeApplication) {
+            return false;
         }
 
-        $data = $request->validate([
-            'owner_address' => 'required|string|max:1000',
-            'identity_number' => 'nullable|string|max:80',
-            'applicant_phone' => 'required|string|max:30',
-            'company_name' => 'required|string|max:180',
-            'business_type' => 'required|string|max:80',
-            'nib' => 'nullable|string|max:100',
-            'company_address' => 'required|string|max:1000',
-            'city' => 'required|string|max:100',
-            'province' => 'required|string|max:100',
-            'company_phone' => 'required|string|max:30',
-            'company_description' => 'nullable|string|max:3000',
-            'venue_name' => 'required|string|max:150',
-            'address' => 'required|string|max:1000',
-            'contact_phone' => 'required|string|max:30',
-            'description' => 'required|string|max:3000',
-            'sports' => 'required|array|min:1',
-            'sports.*' => 'required|in:Badminton,Futsal,Basketball,Tenis,Mini Soccer',
-            'ownership_type' => 'required|in:Milik Sendiri,Sewa',
-            'google_maps_url' => 'nullable|url|max:500',
-            'operating_hours' => 'required|string|max:150',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
-            'facilities' => 'nullable|array|max:30',
-            'facilities.*' => 'string|max:80',
-            'identity_document' => [$activeApplication ? 'nullable' : 'required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
-            'ownership_document' => 'required_if:ownership_type,Milik Sendiri|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'lease_document' => 'required_if:ownership_type,Sewa|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'business_license' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5120',
-            'venue_exterior_photo' => [$activeApplication ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'venue_interior_photo' => [$activeApplication ? 'nullable' : 'required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
-            'court_photos' => [$activeApplication ? 'nullable' : 'required', 'array', 'min:1', 'max:8'],
-            'court_photos.*' => 'image|mimes:jpg,jpeg,png,webp|max:5120',
+        return $activeApplication->documents()
+            ->where('document_type', $documentType)
+            ->exists();
+    };
+
+    $relationship = $request->input('applicant_relationship');
+    $ownershipType = $request->input('ownership_type');
+
+    $ownershipDocumentType = $ownershipType === 'Sewa'
+        ? 'Perjanjian Sewa'
+        : 'Bukti Kepemilikan';
+
+    $needsAuthorization = in_array(
+        $relationship,
+        ['manager', 'representative'],
+        true
+    );
+
+    $hasIdentity = $hasDocument('Identitas Pemohon');
+    $hasOwnership = $hasDocument($ownershipDocumentType);
+    $hasAuthorization = $hasDocument('Surat Kuasa/Penunjukan');
+    $hasExterior = $hasDocument('Foto Tampak Depan');
+    $hasInterior = $hasDocument('Foto Bagian Dalam');
+    $hasCourtPhotos = $hasDocument('Foto Fasilitas Lapangan');
+
+    $data = $request->validate([
+        // Identitas pemohon
+        'applicant_phone' => 'required|string|max:30',
+        'applicant_relationship' => 'required|in:owner,manager,representative',
+        'identity_number' => 'nullable|string|max:80',
+        'owner_address' => 'required|string|max:1000',
+
+        // Pernyataan tanggung jawab
+        'accepted_terms' => 'accepted',
+
+        // Data perusahaan
+        'company_name' => 'required|string|max:180',
+        'business_type' => 'required|string|max:80',
+        'nib' => 'nullable|string|max:100',
+        'company_address' => 'required|string|max:1000',
+        'city' => 'required|string|max:100',
+        'province' => 'required|string|max:100',
+        'company_phone' => 'required|string|max:30',
+        'company_description' => 'nullable|string|max:3000',
+
+        // Informasi venue
+        'venue_name' => 'required|string|max:150',
+        'address' => 'required|string|max:1000',
+        'contact_phone' => 'required|string|max:30',
+        'description' => 'required|string|max:3000',
+        'sports' => 'required|array|min:1',
+        'sports.*' => 'required|in:Badminton,Futsal,Basketball,Tenis,Mini Soccer',
+        'ownership_type' => 'required|in:Milik Sendiri,Sewa',
+        'google_maps_url' => 'nullable|url|max:500',
+        'operating_hours' => 'required|string|max:150',
+        'latitude' => 'nullable|numeric|between:-90,90',
+        'longitude' => 'nullable|numeric|between:-180,180',
+        'facilities' => 'nullable|array|max:30',
+        'facilities.*' => 'string|max:80',
+
+        // Dokumen identitas
+        'identity_document' => [
+            $hasIdentity ? 'nullable' : 'required',
+            'file',
+            'mimes:pdf,jpg,jpeg,png',
+            'max:5120'
+        ],
+
+        // Bukti kepemilikan atau perjanjian sewa
+        'ownership_document' => [
+            $ownershipType === 'Milik Sendiri' && !$hasOwnership
+                ? 'required'
+                : 'nullable',
+            'file',
+            'mimes:pdf,jpg,jpeg,png',
+            'max:5120'
+        ],
+
+        'lease_document' => [
+            $ownershipType === 'Sewa' && !$hasOwnership
+                ? 'required'
+                : 'nullable',
+            'file',
+            'mimes:pdf,jpg,jpeg,png',
+            'max:5120'
+        ],
+
+        // Surat kuasa untuk pengelola/perwakilan
+        'authorization_document' => [
+            $needsAuthorization && !$hasAuthorization
+                ? 'required'
+                : 'nullable',
+            'file',
+            'mimes:pdf,jpg,jpeg,png',
+            'max:5120'
+        ],
+
+        'business_license' => [
+            'nullable',
+            'file',
+            'mimes:pdf,jpg,jpeg,png',
+            'max:5120'
+        ],
+
+        // Foto venue
+        'venue_exterior_photo' => [
+            $hasExterior ? 'nullable' : 'required',
+            'image',
+            'mimes:jpg,jpeg,png,webp',
+            'max:5120'
+        ],
+
+        'venue_interior_photo' => [
+            $hasInterior ? 'nullable' : 'required',
+            'image',
+            'mimes:jpg,jpeg,png,webp',
+            'max:5120'
+        ],
+
+        'court_photos' => [
+            $hasCourtPhotos ? 'nullable' : 'required',
+            'array',
+            'min:1',
+            'max:8'
+        ],
+
+        'court_photos.*' => [
+            'image',
+            'mimes:jpg,jpeg,png,webp',
+            'max:5120'
+        ],
+    ], [
+        'applicant_relationship.required' => 'Pilih hubungan kamu dengan usaha.',
+        'applicant_relationship.in' => 'Hubungan pemohon tidak valid.',
+        'accepted_terms.accepted' => 'Kamu harus menyetujui pernyataan tanggung jawab.',
+        'authorization_document.required' => 'Surat kuasa atau surat penunjukan wajib dilampirkan.',
+        'ownership_document.required' => 'Bukti kepemilikan wajib dilampirkan.',
+        'lease_document.required' => 'Perjanjian sewa wajib dilampirkan.',
+    ]);
+
+    DB::transaction(function () use (
+        $user,
+        $data,
+        $activeApplication,
+        $isRevision
+    ) {
+        $application = $activeApplication
+            ?: new VenueApplication(['user_id' => $user->id]);
+
+        $oldStatus = $activeApplication?->status;
+
+        $application->fill([
+            'user_id' => $user->id,
+            'applicant_phone' => $data['applicant_phone'],
+            'applicant_relationship' => $data['applicant_relationship'],
+            'responsibility_agreed_at' => now(),
+
+            'owner_address' => $data['owner_address'],
+            'identity_number' => $data['identity_number'] ?? null,
+
+            'company_name' => $data['company_name'],
+            'business_type' => $data['business_type'],
+            'nib' => $data['nib'] ?? null,
+            'company_address' => $data['company_address'],
+            'city' => $data['city'],
+            'province' => $data['province'],
+            'company_phone' => $data['company_phone'],
+            'company_description' => $data['company_description'] ?? null,
+
+            'venue_name' => $data['venue_name'],
+            'address' => $data['address'],
+            'contact_phone' => $data['contact_phone'],
+            'description' => $data['description'],
+            'sports' => $data['sports'],
+            'ownership_type' => $data['ownership_type'],
+            'google_maps_url' => $data['google_maps_url'] ?? null,
+            'operating_hours' => $data['operating_hours'],
+            'latitude' => $data['latitude'] ?? null,
+            'longitude' => $data['longitude'] ?? null,
+            'facilities' => array_values(
+                array_unique($data['facilities'] ?? [])
+            ),
+
+            'status' => 'pending',
+            'admin_note' => null,
+            'reviewed_by' => null,
+            'reviewed_at' => null,
         ]);
 
-        DB::transaction(function () use ($user, $data, $activeApplication) {
-            $application = $activeApplication ?: new VenueApplication(['user_id' => $user->id]);
-            $oldStatus = $activeApplication?->status;
-            $application->fill([
-                'user_id' => $user->id,
-                'owner_address' => $data['owner_address'],
-                'identity_number' => $data['identity_number'] ?? null,
-                'applicant_phone' => $data['applicant_phone'],
-                'company_name' => $data['company_name'],
-                'business_type' => $data['business_type'],
-                'nib' => $data['nib'] ?? null,
-                'company_address' => $data['company_address'],
-                'city' => $data['city'],
-                'province' => $data['province'],
-                'company_phone' => $data['company_phone'],
-                'company_description' => $data['company_description'] ?? null,
-                'venue_name' => $data['venue_name'],
-                'address' => $data['address'],
-                'contact_phone' => $data['contact_phone'],
-                'description' => $data['description'],
-                'sports' => $data['sports'],
-                'ownership_type' => $data['ownership_type'],
-                'google_maps_url' => $data['google_maps_url'] ?? null,
-                'operating_hours' => $data['operating_hours'],
-                'latitude' => $data['latitude'] ?? null,
-                'longitude' => $data['longitude'] ?? null,
-                'facilities' => array_values(array_unique($data['facilities'] ?? [])),
-                'status' => 'pending',
-                'admin_note' => null,
-                'reviewed_by' => null,
-                'reviewed_at' => null,
-            ]);
-            $application->save();
+        $application->save();
 
-            $documentFields = [
-                'identity_document' => 'Identitas Pemohon',
-                'ownership_document' => 'Bukti Kepemilikan',
-                'lease_document' => 'Perjanjian Sewa',
-                'business_license' => 'NIB atau Izin Usaha',
-                'venue_exterior_photo' => 'Foto Tampak Depan',
-                'venue_interior_photo' => 'Foto Bagian Dalam',
-            ];
-            foreach ($documentFields as $field => $label) {
-                if (!empty($data[$field])) {
-                    $this->storeApplicationDocument($application, $label, $data[$field]);
-                }
-            }
-            foreach (($data['court_photos'] ?? []) as $photo) {
-                $this->storeApplicationDocument($application, 'Foto Fasilitas Lapangan', $photo);
-            }
-            $application->histories()->create([
-                'actor_id' => $user->id,
-                'from_status' => $oldStatus,
-                'to_status' => 'pending',
-                'note' => $oldStatus === 'revision' ? 'Pemohon mengirim perbaikan pengajuan.' : 'Pengajuan dikirim.',
-            ]);
-        });
+        $documentFields = [
+            'identity_document' => 'Identitas Pemohon',
+            'ownership_document' => 'Bukti Kepemilikan',
+            'lease_document' => 'Perjanjian Sewa',
+            'authorization_document' => 'Surat Kuasa/Penunjukan',
+            'business_license' => 'NIB atau Izin Usaha',
+            'venue_exterior_photo' => 'Foto Tampak Depan',
+            'venue_interior_photo' => 'Foto Bagian Dalam',
+        ];
 
-        $user->notify(new ArenaUserNotification(
-            'Pengajuan Admin Venue Dikirim',
-            'Pengajuan venue berhasil dikirim dan sedang menunggu pemeriksaan Superadmin.',
-            route('user.venue-application', [], false)
-        ));
-        User::where('role', 'superadmin')->where('status', 'Aktif')->get()->each(function (User $superadmin) {
+        foreach ($documentFields as $field => $label) {
+            if (!empty($data[$field])) {
+                $this->storeApplicationDocument(
+                    $application,
+                    $label,
+                    $data[$field]
+                );
+            }
+        }
+
+        foreach (($data['court_photos'] ?? []) as $photo) {
+            $this->storeApplicationDocument(
+                $application,
+                'Foto Fasilitas Lapangan',
+                $photo
+            );
+        }
+
+        $application->histories()->create([
+            'actor_id' => $user->id,
+            'from_status' => $oldStatus,
+            'to_status' => 'pending',
+            'note' => $isRevision
+                ? 'Pemohon mengirim perbaikan pengajuan.'
+                : 'Pengajuan dikirim.',
+        ]);
+    });
+
+    $user->notify(new ArenaUserNotification(
+        'Pengajuan Admin Venue Dikirim',
+        'Pengajuan venue berhasil dikirim dan sedang menunggu pemeriksaan Superadmin.',
+        route('user.venue-application', [], false)
+    ));
+
+    User::where('role', 'superadmin')
+        ->where('status', 'Aktif')
+        ->get()
+        ->each(function (User $superadmin) {
             $superadmin->notify(new ArenaUserNotification(
                 'Pengajuan Venue Baru',
                 'Ada pengajuan Admin Venue baru yang perlu diperiksa.',
@@ -344,8 +511,14 @@ class MarketplaceController extends Controller
             ));
         });
 
-        return redirect()->route('user.venue-application')->with('success', 'Pengajuan berhasil dikirim dan menunggu verifikasi Superadmin.');
-    }
+    return redirect()
+        ->route('user.venue-application')
+        ->with(
+            'success',
+            'Pengajuan berhasil dikirim dan menunggu verifikasi Superadmin.'
+        );
+}
+
 
     private function storeApplicationDocument(
         VenueApplication $application,
@@ -549,41 +722,46 @@ class MarketplaceController extends Controller
     /**
      * Mengambil jadwal booking pada tanggal tertentu.
      */
-    public function availability(
-        Request $request,
-        Lapangan $lapangan
-    ) {
-        $lapangan->loadMissing('venue');
-        abort_unless(!$lapangan->venue_id || $lapangan->venue?->status === 'Aktif', 404);
+    
+/**
+ * Mengambil jadwal booking pada tanggal tertentu.
+ */
+public function availability(
+    Request $request,
+    Lapangan $lapangan
+) {
+    $lapangan->loadMissing('venue');
 
-        $data = $request->validate([
-            'date' => 'required|date|after_or_equal:today'
+    abort_unless(
+        !$lapangan->venue_id || $lapangan->venue?->status === 'Aktif',
+        404
+    );
+
+    $data = $request->validate([
+        'date' => 'required|date|after_or_equal:today'
+    ]);
+
+    $bookings = Booking::where('lapangan_id', $lapangan->id)
+        ->whereDate('booking_date', $data['date'])
+        ->whereIn('status', [
+            'Menunggu',
+            'DP',
+            'Lunas'
+        ])
+        ->get([
+            'start_time',
+            'end_time',
+            'hours',
+            'status'
         ]);
 
-        $bookings = Booking::where(
-            'lapangan_id',
-            $lapangan->id
-        )
-            ->whereDate('booking_date', $data['date'])
-            ->whereIn('status', [
-                'Menunggu',
-                'DP',
-                'Lunas',
-                'Selesai'
-            ])
-            ->get([
-                'start_time',
-                'end_time',
-                'hours',
-                'status'
-            ]);
+    return response()->json([
+        'bookings' => $bookings,
+        'opening' => '07:00',
+        'closing' => '23:00'
+    ]);
+}
 
-        return response()->json([
-            'bookings' => $bookings,
-            'opening' => '07:00',
-            'closing' => '23:00'
-        ]);
-    }
 
     /**
      * Menampilkan laporan keuangan Admin Venue.

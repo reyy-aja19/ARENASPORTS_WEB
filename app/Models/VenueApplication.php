@@ -34,6 +34,8 @@ class VenueApplication extends Model
         'latitude',
         'longitude',
         'facilities',
+        'applicant_relationship',
+        'responsibility_agreed_at',
     ];
 
     protected function casts(): array
@@ -44,6 +46,7 @@ class VenueApplication extends Model
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'facilities' => 'array',
+            'responsibility_agreed_at' => 'datetime',
         ];
     }
 

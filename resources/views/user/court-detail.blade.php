@@ -291,17 +291,11 @@
                         style="display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px">
                     </div>
 
-                    <small style="display:flex;gap:14px;margin-top:8px">
-                        <span>
-                            <i style="color:#16a34a">●</i>
-                            Tersedia
-                        </span>
-
-                        <span>
-                            <i style="color:#dc2626">●</i>
-                            Sudah dipesan
-                        </span>
-                    </small>
+                    <small style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
+    <span><i style="color:#16a34a">●</i> Tersedia</span>
+    <span><i style="color:#dc2626">●</i> Sudah dipesan</span>
+    <span><i style="color:#9ca3af">●</i> Waktu berlalu</span>
+</small>
                 </div>
 
 
@@ -357,12 +351,12 @@
 
 <script>
 
+
 // ========================================
 // 1. JAVASCRIPT KETERSEDIAAN JADWAL BOOKING
 // ========================================
 
 (() => {
-
     const dateInput = document.getElementById('booking-date');
     const startInput = document.getElementById('booking-start');
     const hoursInput = document.getElementById('booking-hours');
@@ -370,7 +364,7 @@
     const endDisplay = document.getElementById('booking-end-display');
 
     const submitButton = document.querySelector(
-        '.u-form button[type=submit]'
+        '.u-form button[type="submit"]'
     );
 
     if (!dateInput || !startInput || !hoursInput || !grid) {
@@ -381,121 +375,223 @@
     const today = @json(now()->toDateString());
 
     let intervals = [];
+    let opening = 7 * 60;
+    let closing = 23 * 60;
+    let loading = false;
 
-    // Mengubah jam menjadi menit
-    const toMinutes = (time) => {
-        const [h, m] = time.split(':').map(Number);
-        return h * 60 + m;
-    };
+    // Mengubah format HH:mm menjadi menit.
+    function toMinutes(time) {
+        const [hour, minute] = time.substring(0, 5).split(':').map(Number);
+        return hour * 60 + minute;
+    }
 
+    // Memeriksa apakah dua rentang waktu saling berbenturan.
+    function isOverlapping(startA, endA, startB, endB) {
+        return startA < endB && endA > startB;
+    }
 
-    // Menampilkan jadwal tersedia dan sudah dipesan
+    // Memeriksa apakah satu slot benar-benar sudah dipesan.
+    function isBooked(start, end) {
+        return intervals.some(booking => {
+            return isOverlapping(
+                start,
+                end,
+                toMinutes(booking.start_time),
+                toMinutes(booking.end_time)
+            );
+        });
+    }
+
+    // Memeriksa apakah waktu sudah berlalu.
+    function isPast(start) {
+        if (dateInput.value !== today) {
+            return false;
+        }
+
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        return start <= currentMinutes;
+    }
+
+    // Memeriksa apakah rentang booking yang dipilih valid.
+    function validateSelection() {
+        if (!startInput.value) {
+            return {
+                valid: false,
+                message: 'Silakan pilih jam mulai.'
+            };
+        }
+
+        const start = toMinutes(startInput.value);
+        const end = start + Number(hoursInput.value) * 60;
+
+        if (start < opening || start >= closing) {
+            return {
+                valid: false,
+                message: 'Jam mulai harus berada pada pukul 07.00–22.00.'
+            };
+        }
+
+        if (end > closing) {
+            return {
+                valid: false,
+                message: 'Jam selesai melewati batas operasional pukul 23.00.'
+            };
+        }
+
+        if (isPast(start)) {
+            return {
+                valid: false,
+                message: 'Jam mulai tersebut sudah berlalu.'
+            };
+        }
+
+        const conflict = intervals.some(booking => {
+            return isOverlapping(
+                start,
+                end,
+                toMinutes(booking.start_time),
+                toMinutes(booking.end_time)
+            );
+        });
+
+        if (conflict) {
+            return {
+                valid: false,
+                message: 'Rentang waktu yang dipilih berbenturan dengan jadwal booking lain.'
+            };
+        }
+
+        return {
+            valid: true,
+            message: 'Jadwal tersedia.'
+        };
+    }
+
+    // Membuat tampilan jadwal per jam.
     function render() {
-
         grid.innerHTML = '';
 
-        for (let h = 0; h < 23; h++) {
+        for (let start = opening; start < closing; start += 60) {
+            const end = start + 60;
 
-            const time = String(h).padStart(2, '0') + ':00';
+            const hour = String(Math.floor(start / 60)).padStart(2, '0');
+            const minute = String(start % 60).padStart(2, '0');
+            const time = `${hour}:${minute}`;
 
-            const begin = h * 60;
-
-            const end = begin + (Number(hoursInput.value) * 60);
-
-            const past =
-                dateInput.value === today &&
-                begin <= new Date().getHours() * 60 + new Date().getMinutes();
-
-            const conflict =
-                end >= 24 * 60 ||
-                past ||
-                intervals.some(x =>
-                    begin < toMinutes(x.end_time) &&
-                    end > toMinutes(x.start_time)
-                );
+            // Warna merah hanya jika slot satu jam ini benar-benar dipesan.
+            const booked = isBooked(start, end);
+            const past = isPast(start);
 
             const btn = document.createElement('button');
 
             btn.type = 'button';
             btn.textContent = time;
 
-            btn.style.cssText =
-                'padding:9px 5px;' +
-                'border:1px solid ' + (conflict ? '#dc2626' : '#16a34a') + ';' +
-                'border-radius:9px;' +
-                'background:' + (conflict ? '#fee2e2' : '#dcfce7') + ';' +
-                'color:' + (conflict ? '#991b1b' : '#166534') + ';' +
-                'cursor:' + (conflict ? 'not-allowed' : 'pointer');
+            let borderColor;
+            let backgroundColor;
+            let textColor;
 
-            btn.disabled = conflict;
+            if (booked) {
+                // Merah: sudah dipesan.
+                borderColor = '#dc2626';
+                backgroundColor = '#fee2e2';
+                textColor = '#991b1b';
+                btn.disabled = true;
+                btn.title = 'Waktu ini sudah dipesan';
+            } else if (past) {
+                // Abu-abu: waktu sudah berlalu.
+                borderColor = '#d1d5db';
+                backgroundColor = '#f3f4f6';
+                textColor = '#9ca3af';
+                btn.disabled = true;
+                btn.title = 'Waktu sudah berlalu';
+            } else {
+                // Hijau: slot satu jam ini belum dipesan.
+                borderColor = '#16a34a';
+                backgroundColor = '#dcfce7';
+                textColor = '#166534';
+                btn.disabled = false;
+                btn.title = 'Pilih jam mulai ini';
+            }
 
-            if (!conflict) {
+            btn.style.cssText = `
+                padding: 9px 5px;
+                border: 1px solid ${borderColor};
+                border-radius: 9px;
+                background: ${backgroundColor};
+                color: ${textColor};
+                cursor: ${btn.disabled ? 'not-allowed' : 'pointer'};
+                font-weight: 600;
+            `;
 
+            if (!btn.disabled) {
                 btn.addEventListener('click', () => {
-
                     startInput.value = time;
 
+                    render();
                     updateEnd();
-
-                    grid.querySelectorAll('button').forEach(b => {
-                        b.style.outline = 'none';
-                    });
-
-                    btn.style.outline = '2px solid #14532d';
-
                 });
+            }
 
+            if (startInput.value === time) {
+                btn.style.outline = '2px solid #14532d';
+                btn.style.outlineOffset = '2px';
             }
 
             grid.appendChild(btn);
-
         }
-
     }
 
-
-    // Menghitung jam selesai
+    // Menghitung jam selesai dan memvalidasi durasi booking.
     function updateEnd() {
+        if (!startInput.value) {
+            endDisplay.textContent = 'Silakan pilih jam mulai.';
 
-        if (!startInput.value) return;
+            if (submitButton) {
+                submitButton.disabled = loading;
+            }
 
-        const end =
-            toMinutes(startInput.value) +
-            Number(hoursInput.value) * 60;
+            return;
+        }
 
-        const invalid =
-            end >= 24 * 60 ||
-            intervals.some(x =>
-                toMinutes(startInput.value) < toMinutes(x.end_time) &&
-                end > toMinutes(x.start_time)
-            );
+        const start = toMinutes(startInput.value);
+        const end = start + Number(hoursInput.value) * 60;
 
-        if (endDisplay) {
+        const endHour = String(Math.floor(end / 60)).padStart(2, '0');
+        const endMinute = String(end % 60).padStart(2, '0');
 
+        const result = validateSelection();
+
+        if (result.valid) {
             endDisplay.textContent =
-                end >= 24 * 60
-                    ? 'Jam selesai melewati tengah malam. Pilih jam mulai atau durasi lain.'
-                    : 'Jam selesai otomatis: ' +
-                        String(Math.floor(end / 60)).padStart(2, '0') +
-                        ':' +
-                        String(end % 60).padStart(2, '0');
+                `Jam selesai: ${endHour}:${endMinute} — ${result.message}`;
 
+            endDisplay.style.color = '#15803d';
+        } else {
+            endDisplay.textContent =
+                `Jam selesai: ${endHour}:${endMinute} — ${result.message}`;
+
+            endDisplay.style.color = '#dc2626';
         }
 
         if (submitButton) {
-            submitButton.disabled = invalid;
+            submitButton.disabled = loading || !result.valid;
         }
-
     }
 
-
-    // Mengambil data jadwal dari Laravel
+    // Mengambil jadwal booking dari server.
     async function load() {
+        loading = true;
+
+        if (submitButton) {
+            submitButton.disabled = true;
+        }
 
         grid.innerHTML = '<small>Memuat jadwal...</small>';
 
         try {
-
             const response = await fetch(
                 url + '?date=' + encodeURIComponent(dateInput.value),
                 {
@@ -506,74 +602,57 @@
             );
 
             if (!response.ok) {
-                throw new Error('Gagal mengambil jadwal');
+                throw new Error('Gagal mengambil jadwal.');
             }
 
             const data = await response.json();
 
             intervals = data.bookings || [];
+            opening = toMinutes(data.opening || '07:00');
+            closing = toMinutes(data.closing || '23:00');
+
+            loading = false;
 
             render();
-
             updateEnd();
 
         } catch (error) {
+            intervals = [];
+            loading = true;
 
             grid.innerHTML =
-                '<small>Jadwal tidak dapat dimuat. Silakan muat ulang halaman.</small>';
+                '<small style="color:#dc2626">Jadwal gagal dimuat. Silakan ubah tanggal atau muat ulang halaman.</small>';
 
+            endDisplay.textContent =
+                'Booking tidak dapat dilakukan karena jadwal gagal dimuat.';
+
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
         }
-
     }
 
+    // Event ketika tanggal berubah.
+    dateInput.addEventListener('change', () => {
+        load();
+    });
 
-    // Event perubahan tanggal
-    dateInput.addEventListener('change', load);
-
-
-    // Event perubahan durasi
+    // Event ketika durasi berubah.
     hoursInput.addEventListener('change', () => {
-
         render();
-
         updateEnd();
-
     });
 
-
-    // Event perubahan jam mulai
+    // Event ketika jam mulai diubah secara manual.
     startInput.addEventListener('change', () => {
-
-        const chosen = toMinutes(startInput.value);
-
-        const end = chosen + Number(hoursInput.value) * 60;
-
-        const conflict =
-            end >= 24 * 60 ||
-            intervals.some(x =>
-                chosen < toMinutes(x.end_time) &&
-                end > toMinutes(x.start_time)
-            );
-
-        if (conflict) {
-
-            alert(
-                'Rentang waktu tersebut sudah dipesan atau melewati tengah malam. Pilih waktu lain.'
-            );
-
-            startInput.value = '';
-
-        }
-
+        render();
         updateEnd();
-
     });
 
-
-    // Muat jadwal pertama kali
+    // Memuat jadwal pertama kali.
     load();
-
 })();
+
 
 
 // ========================================

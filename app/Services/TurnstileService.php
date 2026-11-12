@@ -1,0 +1,37 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Http;
+use Throwable;
+
+class TurnstileService
+{
+    public function verify(?string $token, ?string $ip = null): bool
+    {
+        if (!$token || !config('services.turnstile.secret_key')) {
+            return false;
+        }
+
+        try {
+            $response = Http::asForm()
+                ->timeout(10)
+                ->post(
+                    'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+                    [
+                        'secret' => config('services.turnstile.secret_key'),
+                        'response' => $token,
+                        'remoteip' => $ip,
+                    ]
+                );
+
+            return $response->successful()
+                && $response->json('success') === true;
+
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
+    }
+}

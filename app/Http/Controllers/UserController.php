@@ -108,71 +108,110 @@ class UserController extends Controller
         ));
     }
 
-    public function courts(Request $request): View
-    {
-        $user = $this->optionalUser($request);
+   
+public function courts(Request $request): View
+{
+    $user = $this->optionalUser($request);
 
-        $query = Lapangan::query()
-            ->where('status', 'Tersedia')
-            ->where(function ($venueQuery) {
-                $venueQuery->whereNull('venue_id')
-                    ->orWhereHas('venue', fn ($venue) =>
-                        $venue->where('status', 'Aktif')
-                    );
-            });
+    // Ambil lapangan beserta data venue.
+    $query = Lapangan::with('venue')
+        ->where('status', 'Tersedia')
+        ->where(function ($venueQuery) {
+            $venueQuery->whereNull('venue_id')
+                ->orWhereHas('venue', function ($venue) {
+                    $venue->where('status', 'Aktif');
+                });
+        });
 
-        if ($request->filled('q')) {
-            $query->where(function ($q) use ($request) {
-                $q->where('nama', 'like', '%' . $request->q . '%')
-                    ->orWhere('lokasi', 'like', '%' . $request->q . '%')
-                    ->orWhere('jenis', 'like', '%' . $request->q . '%');
-            });
-        }
+    // Pencarian berdasarkan nama, lokasi, atau jenis olahraga.
+    if ($request->filled('q')) {
+        $query->where(function ($q) use ($request) {
+            $q->where('nama', 'like', '%' . $request->q . '%')
+                ->orWhere('lokasi', 'like', '%' . $request->q . '%')
+                ->orWhere('jenis', 'like', '%' . $request->q . '%');
+        });
+    }
 
-        if ($request->filled('jenis')) {
-            $query->where('jenis', $request->jenis);
-        }
+    // Filter berdasarkan jenis olahraga.
+    if ($request->filled('jenis')) {
+        $query->where('jenis', $request->jenis);
+    }
 
-        $courts = $query->latest()->get();
+    $courts = $query->latest()->get();
 
-        if (
-            $request->filled('lat') &&
-            $request->filled('lng') &&
-            is_numeric($request->lat) &&
-            is_numeric($request->lng)
-        ) {
-            $lat = (float) $request->lat;
-            $lng = (float) $request->lng;
+    // Periksa koordinat lokasi pengguna.
+    if (
+        $request->filled('lat') &&
+        $request->filled('lng') &&
+        is_numeric($request->lat) &&
+        is_numeric($request->lng)
+    ) {
+        $lat = (float) $request->lat;
+        $lng = (float) $request->lng;
+
+        // Pastikan koordinat pengguna valid.
+        if ($lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) {
 
             $courts = $courts->map(function ($court) use ($lat, $lng) {
+
                 $court->distance_km = null;
 
+                // Prioritas koordinat dari venue.
+                $latitude = $court->venue?->latitude;
+                $longitude = $court->venue?->longitude;
+
+                // Jika koordinat venue tidak lengkap,
+                // gunakan koordinat lapangan.
                 if (
-                    $court->latitude !== null &&
-                    $court->longitude !== null
+                    !is_numeric($latitude) ||
+                    !is_numeric($longitude)
                 ) {
-                    $dLat = deg2rad((float) $court->latitude - $lat);
-                    $dLng = deg2rad((float) $court->longitude - $lng);
+                    $latitude = $court->latitude;
+                    $longitude = $court->longitude;
+                }
 
-                    $a = sin($dLat / 2) ** 2
-                        + cos(deg2rad($lat))
-                        * cos(deg2rad((float) $court->latitude))
-                        * sin($dLng / 2) ** 2;
+                // Hitung jarak jika koordinat tersedia.
+                if (
+                    is_numeric($latitude) &&
+                    is_numeric($longitude)
+                ) {
+                    $latitude = (float) $latitude;
+                    $longitude = (float) $longitude;
 
-                    $court->distance_km = 6371 * 2 * atan2(
-                        sqrt($a),
-                        sqrt(max(0, 1 - $a))
-                    );
+                    // Pastikan koordinat tujuan valid.
+                    if (
+                        $latitude >= -90 &&
+                        $latitude <= 90 &&
+                        $longitude >= -180 &&
+                        $longitude <= 180
+                    ) {
+                        $dLat = deg2rad($latitude - $lat);
+                        $dLng = deg2rad($longitude - $lng);
+
+                        // Rumus Haversine.
+                        $a = sin($dLat / 2) ** 2
+                            + cos(deg2rad($lat))
+                            * cos(deg2rad($latitude))
+                            * sin($dLng / 2) ** 2;
+
+                        $court->distance_km = 6371 * 2 * atan2(
+                            sqrt($a),
+                            sqrt(max(0, 1 - $a))
+                        );
+                    }
                 }
 
                 return $court;
+
             })->sortBy(
                 fn ($court) => $court->distance_km ?? INF
             )->values();
         }
-
-        return view('user.courts', compact('user', 'courts'));
     }
+
+    return view('user.courts', compact('user', 'courts'));
+}
+
 
     public function courtDetail(
         Request $request,
@@ -336,7 +375,7 @@ class UserController extends Controller
 
         if ($data['payment_method'] === 'Cash') {
             return redirect()
-                ->route('user.payments', [], false)
+                ->route('user.payments')
                 ->with(
                     'success',
                     'Booking berhasil dibuat. Pembayaran tunai dilakukan di venue dan harus dikonfirmasi oleh Admin Venue.'
