@@ -53,6 +53,20 @@ Route::get('/auth/google/redirect', [AuthController::class, 'redirectToGoogle'])
 Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])
     ->name('auth.google.callback');
 
+Route::get('/debug-session', function (\Illuminate\Http\Request $request) {
+    $request->session()->put('tes_waktu', now()->toDateTimeString());
+    return response()->json([
+        'driver' => config('session.driver'),
+        'secure' => config('session.secure'),
+        'domain' => config('session.domain'),
+        'same_site' => config('session.same_site'),
+        'headers_sent' => headers_sent($file, $line),
+        'headers_sent_at' => $file ? "$file:$line" : null,
+        'session_id' => $request->session()->getId(),
+        'writable' => is_writable(storage_path('framework/sessions')),
+    ]);
+});
+
 Route::get('/register', [AuthController::class, 'showRegister'])
     ->name('register');
 
