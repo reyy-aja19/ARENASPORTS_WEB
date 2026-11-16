@@ -100,14 +100,69 @@ class MarketplaceController extends Controller
     {
         $user = User::whereKey($request->session()->get('admin_user_id'))->where('role', 'user')->where('status', 'Aktif')->first();
 
-        $venues = Venue::withCount([
+        $query = Venue::withCount([
             'lapangans' => function ($query) {
                 $query->where('status', 'Tersedia');
             }
-        ])
-            ->where('status', 'Aktif')
-            ->latest()
-            ->get();
+        ])->where('status', 'Aktif');
+
+        // Filter pencarian nama / kota / alamat
+        if ($request->filled('q')) {
+            $q = trim($request->q);
+            $query->where(function ($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('company_name', 'like', "%{$q}%")
+                    ->orWhere('address', 'like', "%{$q}%")
+                    ->orWhere('city', 'like', "%{$q}%")
+                    ->orWhere('province', 'like', "%{$q}%");
+            });
+        }
+
+        $venues = $query->latest()->get();
+
+        // Cek koordinat GPS user
+        if (
+            $request->filled('lat') &&
+            $request->filled('lng') &&
+            is_numeric($request->lat) &&
+            is_numeric($request->lng)
+        ) {
+            $lat = (float) $request->lat;
+            $lng = (float) $request->lng;
+
+            if ($lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) {
+                $venues = $venues->map(function ($venue) use ($lat, $lng) {
+                    $venue->distance_km = null;
+
+                    $vLat = $venue->latitude;
+                    $vLng = $venue->longitude;
+
+                    if (is_numeric($vLat) && is_numeric($vLng)) {
+                        $vLat = (float) $vLat;
+                        $vLng = (float) $vLng;
+
+                        if ($vLat >= -90 && $vLat <= 90 && $vLng >= -180 && $vLng <= 180) {
+                            $dLat = deg2rad($vLat - $lat);
+                            $dLng = deg2rad($vLng - $lng);
+
+                            $a = sin($dLat / 2) ** 2
+                                + cos(deg2rad($lat))
+                                * cos(deg2rad($vLat))
+                                * sin($dLng / 2) ** 2;
+
+                            $venue->distance_km = 6371 * 2 * atan2(
+                                sqrt($a),
+                                sqrt(max(0, 1 - $a))
+                            );
+                        }
+                    }
+
+                    return $venue;
+                })->sortBy(function ($venue) {
+                    return $venue->distance_km ?? INF;
+                })->values();
+            }
+        }
 
         return view('user.venues', compact('user', 'venues'));
     }
@@ -218,12 +273,39 @@ class MarketplaceController extends Controller
         $user = $this->user($request);
         abort_unless(in_array($user->role, ['user', 'venue_admin'], true), 403);
 
-        $application = $user->venueApplications()
+        // Jika venue_admin mengakses dari link user biasa, arahkan ke rute admin panel
+        if ($user->role === 'venue_admin' && !$request->routeIs('admin.*')) {
+            return redirect()->route('admin.venue-register');
+        }
+
+        $isAdminFlow = $request->routeIs('admin.*') || $user->role === 'venue_admin';
+
+        // Pengajuan aktif yang masih pending atau sedang revisi
+        $activeApplication = $user->venueApplications()
+            ->with(['documents', 'histories.actor'])
+            ->whereIn('status', ['pending', 'revision', 'Menunggu', 'Perlu Revisi'])
+            ->latest()
+            ->first();
+
+        // Pengajuan terakhir untuk referensi riwayat
+        $latestApplication = $user->venueApplications()
             ->with(['documents', 'histories.actor'])
             ->latest()
             ->first();
 
-        return view('user.venue-application', compact('user', 'application'));
+        $application = $activeApplication ?: $latestApplication;
+        $adminUser = $user;
+        $layout = $isAdminFlow ? 'layouts.admin' : 'layouts.user';
+
+        return view('user.venue-application', compact(
+            'user',
+            'adminUser',
+            'application',
+            'activeApplication',
+            'latestApplication',
+            'layout',
+            'isAdminFlow'
+        ));
     }
 
    
@@ -494,10 +576,14 @@ public function applicationStore(Request $request)
         ]);
     });
 
+    $targetRoute = ($request->routeIs('admin.*') || $user->role === 'venue_admin')
+        ? 'admin.venue-register'
+        : 'user.venue-application';
+
     $user->notify(new ArenaUserNotification(
         'Pengajuan Admin Venue Dikirim',
         'Pengajuan venue berhasil dikirim dan sedang menunggu pemeriksaan Superadmin.',
-        route('user.venue-application', [], false)
+        route($targetRoute, [], false)
     ));
 
     User::where('role', 'superadmin')
@@ -512,10 +598,10 @@ public function applicationStore(Request $request)
         });
 
     return redirect()
-        ->route('user.venue-application')
+        ->route($targetRoute)
         ->with(
             'success',
-            'Pengajuan berhasil dikirim dan menunggu verifikasi Superadmin.'
+            'Pengajuan venue berhasil dikirim dan menunggu verifikasi Superadmin.'
         );
 }
 

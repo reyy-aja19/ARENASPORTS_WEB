@@ -315,6 +315,11 @@ Route::middleware([CekLogin::class, 'role:user'])
             UserController::class,
             'profileUpdate'
         ])->name('profile.update');
+
+        Route::get('/api/notifications', [
+            UserNotificationController::class,
+            'apiNotifications'
+        ])->name('api.notifications');
     });
 
 /*
@@ -364,6 +369,16 @@ Route::middleware([CekLogin::class, 'role:superadmin,admin,venue_admin'])
         | PROFIL DAN KEUANGAN VENUE
         |--------------------------------------------------------------------------
         */
+
+        Route::get('/venue-register', [
+            MarketplaceController::class,
+            'applicationForm'
+        ])->name('venue-register');
+
+        Route::post('/venue-register', [
+            MarketplaceController::class,
+            'applicationStore'
+        ])->name('venue-register.store');
 
         Route::get('/venue-finance', [
             MarketplaceController::class,
@@ -435,12 +450,6 @@ Route::middleware([CekLogin::class, 'role:superadmin,admin,venue_admin'])
                 'processWithdrawal'
             ])->name('venue-withdrawals.process');
 
-            // Control center
-            Route::get('/control-center', [
-                AdminController::class,
-                'controlCenter'
-            ])->name('control-center');
-
             // Rewards
             Route::get('/rewards', [AdminController::class, 'rewards'])
                 ->name('rewards');
@@ -467,37 +476,6 @@ Route::middleware([CekLogin::class, 'role:superadmin,admin,venue_admin'])
                 AdminController::class,
                 'rewardDelete'
             ])->name('rewards.delete');
-
-            // Events
-            Route::resource('/events', EventController::class)
-                ->except(['show'])
-                ->names('events');
-
-            // Open Match
-            Route::get('/open-match', [
-                AdminController::class,
-                'openMatches'
-            ])->name('openmatches');
-
-            Route::post('/open-match', [
-                AdminController::class,
-                'openMatchStore'
-            ])->name('openmatches.store');
-
-            Route::put('/open-match/{openMatch}', [
-                AdminController::class,
-                'openMatchUpdate'
-            ])->name('openmatches.update');
-
-            Route::post('/open-match/{openMatch}/toggle', [
-                AdminController::class,
-                'openMatchToggle'
-            ])->name('openmatches.toggle');
-
-            Route::delete('/open-match/{openMatch}', [
-                AdminController::class,
-                'openMatchDelete'
-            ])->name('openmatches.delete');
 
             // Chatbot
             Route::get('/chatbot-settings', [
@@ -544,6 +522,46 @@ Route::middleware([CekLogin::class, 'role:superadmin,admin,venue_admin'])
                 'userDelete'
             ])->name('users.delete');
         });
+
+        /*
+        |--------------------------------------------------------------------------
+        | OPEN MATCH & EVENT RESMI (SUPERADMIN & VENUE ADMIN)
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('/control-center', [
+            AdminController::class,
+            'controlCenter'
+        ])->name('control-center');
+
+        Route::resource('/events', EventController::class)
+            ->except(['show'])
+            ->names('events');
+
+        Route::get('/open-match', [
+            AdminController::class,
+            'openMatches'
+        ])->name('openmatches');
+
+        Route::post('/open-match', [
+            AdminController::class,
+            'openMatchStore'
+        ])->name('openmatches.store');
+
+        Route::put('/open-match/{openMatch}', [
+            AdminController::class,
+            'openMatchUpdate'
+        ])->name('openmatches.update');
+
+        Route::post('/open-match/{openMatch}/toggle', [
+            AdminController::class,
+            'openMatchToggle'
+        ])->name('openmatches.toggle');
+
+        Route::delete('/open-match/{openMatch}', [
+            AdminController::class,
+            'openMatchDelete'
+        ])->name('openmatches.delete');
 
         /*
         |--------------------------------------------------------------------------
@@ -681,14 +699,15 @@ Route::middleware([CekLogin::class, 'role:superadmin,admin,venue_admin'])
             AdminController::class,
             'profileUpdate'
         ])->name('profile.update');
+
+        Route::get('/api/notifications', [
+            AdminController::class,
+            'apiNotifications'
+        ])->name('api.notifications');
         Route::post('/booking/{booking}/perpanjang-manual', [
-    AdminController::class,
-    'bookingExtensionManual'
-])->name('booking-extensions.manual');
-Route::post('/booking/{booking}/perpanjang-manual', [
-    AdminController::class,
-    'bookingExtensionManual'
-])->name('booking-extensions.manual');
+            AdminController::class,
+            'bookingExtensionManual'
+        ])->name('booking-extensions.manual');
 
         /*
         |--------------------------------------------------------------------------

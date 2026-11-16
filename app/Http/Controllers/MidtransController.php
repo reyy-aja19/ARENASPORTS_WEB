@@ -606,8 +606,14 @@ class MidtransController extends Controller
             $payment->status = 'Lunas';
             $payment->paid_at = $payment->paid_at ?? now();
 
-            // Tidak memberikan poin untuk pembayaran perpanjangan.
-            $payment->reward_points_awarded = false;
+            // Berikan reward points untuk perpanjangan lunas (10 poin)
+            if (!$payment->reward_points_awarded && (float) $extension->amount > 0) {
+                $user = User::whereKey($booking->user_id)->lockForUpdate()->first();
+                if ($user) {
+                    $user->increment('points', 10);
+                }
+                $payment->reward_points_awarded = true;
+            }
             $payment->save();
 
             $user = User::find($booking->user_id);

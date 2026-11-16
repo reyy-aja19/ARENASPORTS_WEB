@@ -62,7 +62,7 @@
             </div>
         </div>
         @if($venue->photo)
-            <img class="vd-cover" src="{{ asset($venue->photo) }}" alt="Foto {{ $companyTitle }}">
+            <img class="vd-cover" src="{{ $venue->photo_url ?? asset($venue->photo) }}" alt="Foto {{ $companyTitle }}">
         @else
             <div class="vd-cover" style="display:grid;place-items:center;background:#ffffff18;color:#dff9e6;font-size:70px"><i class="fa-solid fa-building"></i></div>
         @endif

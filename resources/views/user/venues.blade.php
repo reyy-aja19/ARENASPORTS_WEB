@@ -503,11 +503,6 @@
     {{-- HERO BANNER --}}
     <section class="venue-hero">
         <div class="venue-hero-content">
-            <span class="venue-hero-label">
-                <i class="fa-solid fa-store"></i>
-                ArenaSports Marketplace
-            </span>
-
             <h1>Temukan <span>Venue</span></h1>
 
             <p>
@@ -525,8 +520,7 @@
                 Venue Pilihan
             </h2>
             <p>
-                Pilih toko olahraga terlebih dahulu, lalu lihat lapangan
-                yang tersedia di dalamnya.
+                Pilih venue olahraga favoritmu, lalu lihat dan pesan lapangan yang tersedia di dalamnya.
             </p>
         </div>
 
@@ -535,6 +529,50 @@
             {{ $venues->count() }} Venue tersedia
         </span>
     </div>
+
+    {{-- LOKASI TERDEKAT GPS & SEARCH BAR --}}
+    <div class="u-location-bar" style="margin-bottom:20px;">
+        <span style="display:flex; align-items:center; gap:8px;">
+            <i class="fa-solid fa-location-crosshairs" style="color:#168653; font-size:16px;"></i>
+            @if(request()->filled('lat') && request()->filled('lng'))
+                <strong>Lokasi GPS aktif!</strong> Menampilkan venue terdekat dari lokasimu saat ini.
+            @else
+                Aktifkan GPS untuk menemukan venue olahraga yang paling dekat dengan posisimu.
+            @endif
+        </span>
+
+        <div style="display:flex; gap:8px; align-items:center;">
+            @if(request()->filled('lat') && request()->filled('lng'))
+                <a href="{{ route('user.venues', request()->except(['lat', 'lng'])) }}" class="u-btn ghost" style="padding:8px 12px; font-size:11px; text-decoration:none;">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Jarak
+                </a>
+            @endif
+            <button class="u-btn ghost" type="button" id="venueNearbyButton" style="white-space:nowrap;">
+                <i class="fa-solid fa-location-dot"></i>
+                {{ request()->filled('lat') ? 'Perbarui Lokasi GPS' : 'Cari Venue Terdekat' }}
+            </button>
+        </div>
+    </div>
+
+    {{-- FORM PENCARIAN VENUE --}}
+    <form class="u-search" method="GET" style="margin-bottom:26px;">
+        @if(request()->filled('lat') && request()->filled('lng'))
+            <input type="hidden" name="lat" value="{{ request('lat') }}">
+            <input type="hidden" name="lng" value="{{ request('lng') }}">
+        @endif
+
+        <input
+            type="text"
+            name="q"
+            value="{{ request('q') }}"
+            placeholder="Cari nama venue, pengelola, kota, atau alamat..."
+        >
+
+        <button class="u-btn" type="submit">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            Cari
+        </button>
+    </form>
 
     {{-- DAFTAR VENUE --}}
     <div class="venue-grid">
@@ -555,7 +593,7 @@
 
                     @if($venue->photo)
                         <img
-                            src="{{ asset($venue->photo) }}"
+                            src="{{ $venue->photo_url ?? asset($venue->photo) }}"
                             alt="Foto {{ $venue->name }}"
                             loading="lazy"
                         >
@@ -592,6 +630,11 @@
                         <span>
                             {{ $venue->address ?: 'Alamat belum tersedia' }}
                         </span>
+                        @if(isset($venue->distance_km) && $venue->distance_km !== null)
+                            <span class="u-tag" style="background:#e8f7ec; color:#146c43; font-weight:800; border:1px solid #c3e6cb; margin-left:6px; font-size:11px;">
+                                <i class="fa-solid fa-route"></i> {{ number_format($venue->distance_km, 1) }} km
+                            </span>
+                        @endif
                     </div>
 
                     {{-- JENIS OLAHRAGA --}}
@@ -648,5 +691,50 @@
     </div>
 
 </div>
+
+{{-- SCRIPT GPS LOKASI VENUE TERDEKAT --}}
+<script>
+document.getElementById('venueNearbyButton')?.addEventListener('click', function () {
+    const button = this;
+    const originalText = button.innerHTML;
+
+    button.disabled = true;
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mencari koordinat GPS…';
+
+    if (!navigator.geolocation) {
+        alert('Browser Anda tidak mendukung layanan geolokasi GPS.');
+        button.disabled = false;
+        button.innerHTML = originalText;
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        function (pos) {
+            const url = new URL(window.location.href);
+            url.searchParams.set('lat', pos.coords.latitude);
+            url.searchParams.set('lng', pos.coords.longitude);
+            window.location.href = url.toString();
+        },
+        function (err) {
+            let msg = 'Izin lokasi tidak tersedia. Silakan izinkan akses lokasi pada browser Anda.';
+            if (err.code === err.PERMISSION_DENIED) {
+                msg = 'Akses lokasi ditolak. Buka izin lokasi di pengaturan browser untuk mencari venue terdekat.';
+            } else if (err.code === err.POSITION_UNAVAILABLE) {
+                msg = 'Sinyal GPS / posisi saat ini tidak terdeteksi. Silakan coba kembali.';
+            } else if (err.code === err.TIMEOUT) {
+                msg = 'Waktu pencarian lokasi habis. Silakan coba kembali.';
+            }
+            alert(msg);
+            button.disabled = false;
+            button.innerHTML = originalText;
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 12000,
+            maximumAge: 30000
+        }
+    );
+});
+</script>
 
 @endsection

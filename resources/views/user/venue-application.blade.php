@@ -1,5 +1,11 @@
 
-@extends('layouts.user')
+@php
+    $layout = $layout ?? (request()->routeIs('admin.*') || session('admin_role') === 'venue_admin' ? 'layouts.admin' : 'layouts.user');
+@endphp
+@extends($layout, [
+    'title' => 'Daftarkan Venue Baru',
+    'heading' => 'Daftarkan Venue Baru'
+])
 
 @section('content')
 @php
@@ -7,13 +13,25 @@
     $rejectedStatuses = ['rejected', 'Ditolak'];
     $approvedStatuses = ['approved', 'Disetujui'];
 
-    $canSubmit = !$application ||
-        in_array($application->status, array_merge($revisionStatuses, $rejectedStatuses), true);
+    $isVenueAdmin = ($user->role === 'venue_admin') || (session('admin_role') === 'venue_admin');
+    $isAdminFlow = $isAdminFlow ?? ($isVenueAdmin || request()->routeIs('admin.*'));
 
-    $isRevision = $application &&
-        in_array($application->status, $revisionStatuses, true);
+    // Pengajuan aktif yang sedang diverifikasi atau perlu revisi
+    $hasPendingApplication = $activeApplication && in_array($activeApplication->status, ['pending', 'Menunggu'], true);
+    $isRevision = $activeApplication && in_array($activeApplication->status, $revisionStatuses, true);
 
-    $existingDocuments = $application?->documents ?? collect();
+    // Jika venue_admin dan tidak ada pengajuan pending, mereka boleh daftarkan venue baru
+    if ($isVenueAdmin) {
+        $canSubmit = !$hasPendingApplication;
+        $isNewVenueBranch = !$isRevision;
+    } else {
+        $canSubmit = !$application ||
+            in_array($application->status, array_merge($revisionStatuses, $rejectedStatuses), true);
+        $isNewVenueBranch = false;
+    }
+
+    // Dokumen tersimpan hanya berlaku saat mode revisi
+    $existingDocuments = ($isRevision && $activeApplication) ? $activeApplication->documents : collect();
 
     $hasIdentityDocument = $isRevision &&
         $existingDocuments->contains('document_type', 'Identitas Pemohon');
@@ -36,12 +54,16 @@
     $hasCourtPhotos = $isRevision &&
         $existingDocuments->contains('document_type', 'Foto Fasilitas Lapangan');
 
+    // Sumber data prefill
+    $sourceApp = $isRevision ? $activeApplication : ($isNewVenueBranch ? null : $application);
+    $companySource = $isRevision ? $activeApplication : ($latestApplication ?? $application);
+
     $selectedOwnership = old(
         'ownership_type',
-        $application->ownership_type ?? ''
+        $sourceApp->ownership_type ?? ''
     );
 
-    $facilityValues = old('facilities', $application->facilities ?? [
+    $facilityValues = old('facilities', $sourceApp->facilities ?? [
         'Parkir motor',
         'Parkir mobil',
         'Toilet',
@@ -55,7 +77,7 @@
         'Penyewaan perlengkapan'
     ]);
 
-    $sportsValues = old('sports', $application->sports ?? []);
+    $sportsValues = old('sports', $sourceApp->sports ?? []);
 
     if (!is_array($facilityValues)) {
         $facilityValues = [];
@@ -221,6 +243,7 @@
 
 <div class="va-wrap">
 
+    @if(!($isAdminFlow ?? false))
     <div class="va-head">
         <h2>Pengajuan Admin Venue</h2>
         <p>
@@ -228,6 +251,7 @@
             Superadmin akan memeriksa kelayakan venue sebelum memberikan akses Admin Venue.
         </p>
     </div>
+    @endif
 
     @if(session('success'))
         <div class="va-alert">{{ session('success') }}</div>
@@ -249,9 +273,11 @@
     @endif
 
     {{-- STATUS PENGAJUAN --}}
-    @if($application)
+    @if($activeApplication)
         <article class="va-card">
-            <h3 class="va-section-title">Status Pengajuan Terakhir</h3>
+            <h3 class="va-section-title">
+                {{ $isVenueAdmin ? 'Status Pengajuan Cabang/Venue Baru' : 'Status Pengajuan Terakhir' }}
+            </h3>
 
             <span class="va-status">
                 {{
@@ -263,25 +289,25 @@
                         'Perlu Revisi' => 'Perlu Revisi',
                         'Disetujui' => 'Disetujui',
                         'Ditolak' => 'Ditolak'
-                    ][$application->status] ?? $application->status
+                    ][$activeApplication->status] ?? $activeApplication->status
                 }}
             </span>
 
-            <p><strong>{{ $application->venue_name }}</strong></p>
-            <p class="va-muted">{{ $application->address }}</p>
+            <p><strong>{{ $activeApplication->venue_name }}</strong></p>
+            <p class="va-muted">{{ $activeApplication->address }}</p>
 
-            @if($application->admin_note)
+            @if($activeApplication->admin_note)
                 <p>
                     <strong>Catatan Superadmin:</strong>
-                    {{ $application->admin_note }}
+                    {{ $activeApplication->admin_note }}
                 </p>
             @endif
 
-            @if($application->documents->isNotEmpty())
+            @if($activeApplication->documents->isNotEmpty())
                 <div class="va-existing-docs">
                     <strong>Dokumen yang sudah tersimpan:</strong>
                     <ul>
-                        @foreach($application->documents as $document)
+                        @foreach($activeApplication->documents as $document)
                             <li>
                                 {{ $document->document_type }} —
                                 {{ $document->original_name }}
@@ -297,11 +323,11 @@
                 </div>
             @endif
 
-            @if($application->histories->isNotEmpty())
+            @if($activeApplication->histories->isNotEmpty())
                 <div class="va-muted">
                     <strong>Riwayat:</strong>
                     <ul>
-                        @foreach($application->histories as $history)
+                        @foreach($activeApplication->histories as $history)
                             <li>
                                 {{ $history->created_at?->format('d-m-Y H:i') }}
                                 —
@@ -315,6 +341,30 @@
                 </div>
             @endif
         </article>
+    @elseif($isVenueAdmin)
+        <article class="va-card" style="border-left: 4px solid #16834a; background: #f6fbf8;">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <div style="width:42px; height:42px; border-radius:12px; background:#e2f4ea; color:#16834a; display:grid; place-items:center; font-size:18px; flex-shrink:0;">
+                    <i class="fa-solid fa-store"></i>
+                </div>
+                <div>
+                    <h4 style="margin:0; font-size:16px; color:#143e26; font-weight:750;">Pendaftaran Cabang / Venue Baru</h4>
+                    <p style="margin:4px 0 0; color:#537361; font-size:13px; line-height:1.5;">
+                        Sebagai Admin Venue, Anda dapat mendaftarkan venue atau cabang olahraga baru. Lengkapi formulir di bawah ini untuk diverifikasi oleh Superadmin.
+                    </p>
+                </div>
+            </div>
+        </article>
+    @elseif($application && in_array($application->status, $approvedStatuses, true))
+        <article class="va-card">
+            <h3 class="va-section-title">Status Pengajuan Terakhir</h3>
+            <span class="va-status" style="background:#eaf7ee; color:#16804a;">Disetujui</span>
+            <p><strong>{{ $application->venue_name }}</strong></p>
+            <p class="va-muted">{{ $application->address }}</p>
+            <p class="va-muted" style="margin-top:10px;">
+                Pengajuan venue Anda telah disetujui. Akun Anda telah aktif sebagai Admin Venue.
+            </p>
+        </article>
     @endif
 
     {{-- FORM HANYA UNTUK PENGAJUAN BARU, REVISI, ATAU DITOLAK --}}
@@ -322,7 +372,7 @@
 
         <form
             method="POST"
-            action="{{ route('user.venue-application.store') }}"
+            action="{{ ($isAdminFlow ?? false) ? route('admin.venue-register.store') : route('user.venue-application.store') }}"
             enctype="multipart/form-data"
         >
             @csrf
@@ -905,8 +955,9 @@
                     </span>
                 </label>
 
-                <button type="submit" class="u-btn" style="width:100%;margin-top:20px">
-                    {{ $isRevision ? 'Kirim Ulang Pengajuan Setelah Revisi' : 'Kirim Pengajuan untuk Diverifikasi' }}
+                <button type="submit" class="btn-ui btn-green {{ ($isAdminFlow ?? false) ? '' : 'u-btn' }}" style="width:100%;margin-top:20px;padding:14px 20px;font-size:15px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;cursor:pointer;">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    {{ $isRevision ? 'Kirim Ulang Pengajuan Setelah Revisi' : (($isNewVenueBranch ?? false) ? 'Kirim Pengajuan Venue Baru untuk Diverifikasi' : 'Kirim Pengajuan untuk Diverifikasi') }}
                 </button>
 
             </section>

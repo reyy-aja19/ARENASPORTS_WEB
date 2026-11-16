@@ -7,32 +7,13 @@
 <div class="u-section-head">
     <div>
         <h2>Cari lapangan</h2>
-        <p>Temukan venue futsal atau badminton yang cocok untukmu.</p>
+        <p>Temukan lapangan futsal, badminton, atau olahraga lainnya yang cocok untukmu.</p>
     </div>
-</div>
-
-
-{{-- LOKASI TERDEKAT --}}
-<div class="u-location-bar">
-    <span>
-        <i class="fa-solid fa-location-crosshairs"></i>
-        Rekomendasi venue terdekat berdasarkan lokasi kamu.
-    </span>
-
-    <button class="u-btn ghost" type="button" id="nearbyButton">
-        <i class="fa-solid fa-location-dot"></i>
-        Cari terdekat
-    </button>
 </div>
 
 
 {{-- FORM PENCARIAN --}}
 <form class="u-search" method="GET">
-
-    @if(request()->filled('lat') && request()->filled('lng'))
-        <input type="hidden" name="lat" value="{{ request('lat') }}">
-        <input type="hidden" name="lng" value="{{ request('lng') }}">
-    @endif
 
     <input
         type="text"
@@ -283,60 +264,5 @@
     @endforelse
 
 </div>
-
-
-{{-- JAVASCRIPT PENCARIAN LOKASI TERDEKAT --}}
-<script>
-document.getElementById('nearbyButton')?.addEventListener('click', function () {
-
-    const button = this;
-
-    button.disabled = true;
-    button.textContent = 'Mencari lokasi…';
-
-    if (!navigator.geolocation) {
-
-        alert('Browser tidak mendukung lokasi.');
-
-        button.disabled = false;
-        button.innerHTML = '<i class="fa-solid fa-location-dot"></i> Cari terdekat';
-
-        return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-
-        function (pos) {
-
-            const url = new URL(window.location.href);
-
-            url.searchParams.set('lat', pos.coords.latitude);
-            url.searchParams.set('lng', pos.coords.longitude);
-
-            window.location.href = url.toString();
-
-        },
-
-        function () {
-
-            alert('Izin lokasi tidak tersedia. Izinkan akses lokasi lalu coba lagi.');
-
-            button.disabled = false;
-
-            button.innerHTML =
-                '<i class="fa-solid fa-location-dot"></i> Cari terdekat';
-
-        },
-
-        {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 60000
-        }
-
-    );
-
-});
-</script>
 
 @endsection

@@ -74,4 +74,31 @@ class User extends Authenticatable
     {
         return $this->hasMany(Payment::class);
     }
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        if (! $this->profile_photo) {
+            return null;
+        }
+
+        $photo = trim($this->profile_photo);
+        if (preg_match('/^https?:\/\//i', $photo)) {
+            return $photo;
+        }
+
+        $path = ltrim($photo, '/');
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        if (str_starts_with($path, 'profiles/')) {
+            return asset('storage/' . $path);
+        }
+
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+            return asset('storage/' . $path);
+        }
+
+        return asset($path);
+    }
 }

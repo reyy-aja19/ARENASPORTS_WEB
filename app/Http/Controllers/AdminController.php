@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Booking;
+use App\Models\BookingExtension;
 use App\Models\Event;
 use App\Models\Lapangan;
 use App\Models\OpenMatch;
@@ -128,9 +129,22 @@ class AdminController extends Controller
 
     private function layoutData(Request $request, array $extra = []): array
     {
+        $adminUser = $this->adminUser($request);
         $courtIds = $this->ownedCourtsQuery($request)->select('id');
         $pendingReviewCount = Review::whereIn('lapangan_id', $courtIds)->whereNull('reply_message')->count();
         $pendingPaymentCount = Payment::whereHas('booking.lapangan', fn ($q) => $q->whereIn('id', $courtIds))->where('status', '!=', 'Lunas')->count();
+
+        $dbNotifs = $adminUser ? $adminUser->unreadNotifications()->latest()->take(10)->get()->map(function ($n) {
+            return [
+                'type' => 'system',
+                'icon' => 'fa-solid fa-bell',
+                'label' => $n->data['title'] ?? 'Notifikasi Sistem',
+                'meta' => $n->data['message'] ?? '',
+                'time' => optional($n->created_at)->diffForHumans(),
+                'sort_at' => optional($n->created_at)?->timestamp ?? 0,
+                'url' => $n->data['url'] ?? route('admin.dashboard'),
+            ];
+        }) : collect();
 
         $notifications = collect()
             ->merge(Review::with(['user', 'lapangan'])
@@ -142,7 +156,7 @@ class AdminController extends Controller
                     return [
                         'type' => 'review',
                         'icon' => 'fa-regular fa-message',
-                        'label' => 'Review belum terbaca',
+                        'label' => 'Review belum dibalas',
                         'meta' => ($review->user?->name ?? 'User') . ' • ' . ($review->lapangan?->nama ?? 'Lapangan') . ' • rating ' . $review->rating . '/5',
                         'time' => optional($review->created_at)->diffForHumans(),
                         'sort_at' => optional($review->created_at)?->timestamp ?? 0,
@@ -165,16 +179,31 @@ class AdminController extends Controller
                         'url' => route('admin.payments'),
                     ];
                 }))
+            ->merge($dbNotifs)
             ->sortByDesc('sort_at')
             ->values();
 
+        $unreadDbCount = $adminUser ? $adminUser->unreadNotifications()->count() : 0;
+        $totalNotificationCount = $pendingReviewCount + $pendingPaymentCount + $unreadDbCount;
+
         return array_merge([
-            'adminUser' => $this->adminUser($request),
+            'adminUser' => $adminUser,
             'pendingReviewCount' => $pendingReviewCount,
             'pendingPaymentCount' => $pendingPaymentCount,
-            'totalNotificationCount' => $pendingReviewCount + $pendingPaymentCount,
+            'totalNotificationCount' => $totalNotificationCount,
             'notifications' => $notifications,
         ], $extra);
+    }
+
+    public function apiNotifications(Request $request)
+    {
+        $data = $this->layoutData($request);
+        return response()->json([
+            'totalCount' => $data['totalNotificationCount'],
+            'pendingReviews' => $data['pendingReviewCount'],
+            'pendingPayments' => $data['pendingPaymentCount'],
+            'notifications' => $data['notifications'],
+        ]);
     }
 
     public function dashboard(Request $request): View
@@ -376,6 +405,9 @@ class AdminController extends Controller
             if ($request->session()->get('admin_role') === 'venue_admin') {
                 $venue = Venue::where('owner_admin_id', $data['owner_admin_id'])->findOrFail($data['venue_id'] ?? null);
                 $data['venue_id'] = $venue->id;
+            } else {
+                // Admin biasa (bukan venue_admin): tidak perlu venue_id
+                $data['venue_id'] = null;
             }
         } else {
             $ownerId = $request->input('owner_admin_id');
@@ -435,6 +467,10 @@ class AdminController extends Controller
             $venue = Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->findOrFail($data['venue_id'] ?? null);
             $data['owner_admin_id'] = $venue->owner_admin_id;
             $data['venue_id'] = $venue->id;
+        } elseif (! $this->isSuperadmin($request)) {
+            // Admin biasa: pertahankan owner_admin_id & venue_id yang sudah ada
+            $data['owner_admin_id'] = $lapangan->owner_admin_id;
+            $data['venue_id'] = $lapangan->venue_id;
         }
         if ($this->isSuperadmin($request) && $request->filled('owner_admin_id')) {
             $ownerId = $request->input('owner_admin_id');
@@ -461,12 +497,8 @@ class AdminController extends Controller
 
     public function bookings(Request $request): View
     {
-        $bookings = Booking::with(['user', 'lapangan'])->whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id'))->latest()->get();
-        $usersQuery = User::where('role', 'user')->where('status', 'Aktif');
-        if (! $this->isSuperadmin($request)) {
-            $usersQuery->whereHas('bookings', fn ($q) => $q->whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id')));
-        }
-        $users = $usersQuery->orderBy('name')->get();
+        $bookings = Booking::with(['user', 'lapangan', 'extensions'])->whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id'))->latest()->get();
+        $users = User::where('role', 'user')->where('status', 'Aktif')->orderBy('name')->get();
         $courts = $this->ownedCourtsQuery($request)->orderBy('nama')->get();
         return view('admin.bookings', $this->layoutData($request, compact('bookings', 'users', 'courts')));
     }
@@ -531,26 +563,37 @@ class AdminController extends Controller
         return back()->with('success', 'Booking berhasil dihapus.');
     }
 
-    /** Single Superadmin workspace for both global Open Match and Event controls. */
+    /** Workspace for Open Match and Event controls. */
     public function controlCenter(Request $request): View
     {
-        abort_unless($this->isSuperadmin($request), 403);
+        $courtIds = $this->ownedCourtsQuery($request)->select('id');
+        $matchesQuery = OpenMatch::with(['booking.user', 'booking.lapangan']);
+        $bookingsQuery = Booking::with(['user', 'lapangan'])->whereIn('status', ['Lunas', 'DP']);
+        $eventsQuery = Event::with('creator');
 
-        $matches = OpenMatch::with(['booking.user', 'booking.lapangan'])->latest()->get();
-        $bookings = Booking::with(['user', 'lapangan'])
-            ->whereIn('status', ['Lunas', 'DP'])
-            ->latest()
-            ->get();
-        $events = Event::with('creator')->latest()->get();
+        if (!$this->isSuperadmin($request)) {
+            $matchesQuery->whereHas('booking.lapangan', fn ($q) => $q->whereIn('id', $courtIds));
+            $bookingsQuery->whereIn('lapangan_id', $courtIds);
+            $eventsQuery->where('created_by', $request->session()->get('admin_user_id'));
+        }
+
+        $matches = $matchesQuery->latest()->get();
+        $bookings = $bookingsQuery->latest()->get();
+        $events = $eventsQuery->latest()->get();
 
         return view('admin.control-center', $this->layoutData($request, compact('matches', 'bookings', 'events')));
     }
 
     public function openMatches(Request $request): View
     {
-        $matches = OpenMatch::with(['booking.user', 'booking.lapangan'])->whereHas('booking.lapangan', fn ($q) => $q->whereIn('id', $this->ownedCourtsQuery($request)->select('id')))->latest()->get();
+        $courtIds = $this->ownedCourtsQuery($request)->select('id');
+        $query = OpenMatch::with(['booking.user', 'booking.lapangan']);
+        if (!$this->isSuperadmin($request)) {
+            $query->whereHas('booking.lapangan', fn ($q) => $q->whereIn('id', $courtIds));
+        }
+        $matches = $query->latest()->get();
         $bookings = Booking::with(['user', 'lapangan'])
-            ->whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id'))
+            ->whereIn('lapangan_id', $courtIds)
             ->whereIn('status', ['Lunas', 'DP'])
             ->latest()
             ->get();
@@ -578,7 +621,16 @@ class AdminController extends Controller
             $this->ensureBookingAccess($request, $booking);
         }
         $data['jumlah_bergabung'] = $data['jumlah_bergabung'] ?? 0;
-        OpenMatch::create($data);
+        $match = OpenMatch::create($data);
+
+        // Notifikasi realtime ke semua user aktif
+        User::where('role', 'user')->where('status', 'Aktif')->get()->each(function (User $user) use ($match) {
+            $user->notify(new ArenaUserNotification(
+                'Open Match Baru: ' . $match->title,
+                'Pertandingan terbuka baru ' . $match->title . ' (' . $match->jenis . ') dibuka. Segera bergabung!',
+                route('user.openmatches', [], false)
+            ));
+        });
 
         return back()->with('success', 'Open match berhasil ditambahkan.');
     }
@@ -949,6 +1001,101 @@ class AdminController extends Controller
 
         $admin->update($data);
         return back()->with('success', 'Profil admin berhasil diperbarui.');
+    }
+
+    public function bookingExtensionManual(Request $request, Booking $booking): RedirectResponse
+    {
+        $this->ensureBookingAccess($request, $booking);
+
+        if ($booking->status !== 'Lunas') {
+            return back()->with('error', 'Perpanjangan manual hanya bisa dilakukan untuk booking yang sudah Lunas.');
+        }
+
+        $data = $request->validate([
+            'hours'        => ['required', 'integer', 'min:1', 'max:8'],
+            'payment_type' => ['required', 'in:Tunai,Gratis'],
+            'note'         => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $previousEnd = substr((string) $booking->end_time, 0, 5);
+        $endTimestamp = strtotime($previousEnd) + ((int) $data['hours'] * 3600);
+        $newEnd = date('H:i', $endTimestamp);
+
+        if ($newEnd <= $previousEnd) {
+            return back()->withInput()->with('error', 'Perpanjangan melewati tengah malam. Pilih durasi yang lebih pendek.');
+        }
+
+        $bookingDate = $booking->booking_date->toDateString();
+
+        $overlap = Booking::where('lapangan_id', $booking->lapangan_id)
+            ->whereDate('booking_date', $bookingDate)
+            ->where('id', '!=', $booking->id)
+            ->whereIn('status', ['Menunggu', 'DP', 'Lunas'])
+            ->where('start_time', '<', $newEnd)
+            ->where('end_time', '>', $previousEnd)
+            ->exists();
+
+        if ($overlap) {
+            return back()->withInput()->with('error', 'Jadwal perpanjangan berbenturan dengan booking lain.');
+        }
+
+        $lapangan = $booking->lapangan;
+        $amount = $data['payment_type'] === 'Gratis' ? 0 : (int) ($lapangan->harga * (int) $data['hours']);
+        $status = 'Lunas';
+
+        DB::transaction(function () use ($booking, $data, $previousEnd, $newEnd, $amount, $status, $request) {
+            $extension = BookingExtension::create([
+                'booking_id'       => $booking->id,
+                'user_id'          => $booking->user_id,
+                'admin_user_id'    => $request->session()->get('admin_user_id'),
+                'hours'            => (int) $data['hours'],
+                'previous_end_time'=> $previousEnd,
+                'new_end_time'     => $newEnd,
+                'amount'           => $amount,
+                'payment_method'   => $data['payment_type'],
+                'status'           => $status,
+                'note'             => $data['note'] ?? 'Perpanjangan manual oleh admin.',
+                'processed_at'     => now(),
+            ]);
+
+            if ($amount > 0) {
+                Payment::create([
+                    'booking_id'           => $booking->id,
+                    'booking_extension_id' => $extension->id,
+                    'user_id'              => $booking->user_id,
+                    'method'               => $data['payment_type'],
+                    'amount'               => $amount,
+                    'status'               => 'Lunas',
+                    'paid_at'              => now(),
+                    'transaction_id'       => 'MANUAL-' . str_pad((string) $extension->id, 8, '0', STR_PAD_LEFT),
+                    'reward_points_awarded'=> true,
+                ]);
+
+                // Tambahkan poin ke user seperti saat booking (10 poin)
+                $user = User::whereKey($booking->user_id)->lockForUpdate()->first();
+                if ($user) {
+                    $user->increment('points', 10);
+                }
+            }
+
+            // Update end_time, hours, dan total_price booking
+            $booking->end_time = $newEnd;
+            $booking->hours = (int) $booking->hours + (int) $data['hours'];
+            $booking->total_price = (float) $booking->total_price + (float) $amount;
+            $booking->save();
+
+            // Kirim notifikasi ke user
+            $userForNotif = User::find($booking->user_id);
+            if ($userForNotif) {
+                $userForNotif->notify(new ArenaUserNotification(
+                    'Perpanjangan Booking Disetujui',
+                    'Booking #' . $booking->id . ' Anda telah diperpanjang ' . $data['hours'] . ' jam hingga ' . $newEnd . '.' . ($amount > 0 ? ' Anda mendapatkan 10 poin reward!' : ''),
+                    route('user.bookings', [], false)
+                ));
+            }
+        });
+
+        return back()->with('success', 'Perpanjangan booking berhasil diproses. Jam selesai diperbarui ke ' . $newEnd . '.');
     }
 
     public function logoutConfirm(Request $request): View

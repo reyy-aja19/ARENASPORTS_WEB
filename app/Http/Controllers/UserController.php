@@ -219,7 +219,9 @@ public function courts(Request $request): View
     ): View {
         $user = $this->optionalUser($request);
 
-        $lapangan->loadMissing('venue');
+        $lapangan->loadMissing(['venue', 'reviews' => function ($q) {
+            $q->where('is_visible', true)->with('user')->latest();
+        }]);
 
         abort_unless(
             $lapangan->status === 'Tersedia' &&
@@ -677,9 +679,10 @@ public function courts(Request $request): View
             ->orderBy('tanggal')
             ->get();
 
-        $events = Event::where('status', 'Publikasi')
-            ->whereDate('tanggal', '>=', today())
-            ->orderBy('tanggal')
+        $events = Event::with(['creator.venue', 'creator.venues'])
+            ->where('status', 'Publikasi')
+            ->whereDate('tanggal', '>=', today()->toDateString())
+            ->orderBy('tanggal', 'asc')
             ->get();
 
         $eligibleBookings = $user

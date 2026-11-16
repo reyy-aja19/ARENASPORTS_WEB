@@ -228,10 +228,6 @@
                 Akun dan informasi kamu dilindungi.
             </div>
 
-            <p class="u-login-admin-note">
-                Admin Venue dan Superadmin juga masuk melalui halaman ini.
-            </p>
-
         </div>
 
     </section>

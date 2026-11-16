@@ -1,13 +1,26 @@
-@extends('layouts.admin', ['title' => 'Manajemen Event & Open Match', 'heading' => 'Manajemen Event & Open Match'])
+@extends('layouts.admin', ['title' => 'Manajemen Open Match', 'heading' => 'Manajemen Open Match'])
 
 @section('content')
 <div class="openmatch-admin-shell">
-    <div class="surface" style="padding:18px 20px;margin-bottom:18px;border-radius:16px;background:linear-gradient(115deg,#effaf1,#ffffff);border:1px solid #d9efdf"><strong><i class="fa-solid fa-calendar-star"></i> Event ArenaSports · khusus Superadmin</strong><p style="margin:7px 0 0;color:#52645a">Gunakan halaman ini untuk mengumumkan event resmi. Pembuatan dan pengelolaan event dibatasi melalui middleware Superadmin; pengguna hanya dapat melihat dan bergabung sesuai aturan Open Match.</p></div>
+    <div class="surface" style="padding:18px 20px;margin-bottom:18px;border-radius:16px;background:linear-gradient(115deg,#effaf1,#ffffff);border:1px solid #d9efdf; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+        <div>
+            <strong><i class="fa-solid fa-people-group"></i> Manajemen Open Match Komunitas</strong>
+            <p style="margin:7px 0 0;color:#52645a">
+                Kelola pertandingan terbuka untuk mempertemukan pemain dan tim komunitas. Untuk mengadakan turnamen/event resmi venue berhadiah, gunakan menu <strong>Manajemen Event</strong>.
+            </p>
+        </div>
+        <a href="{{ route('admin.events.create') }}" class="btn-ui btn-green" style="background:#0e623a; text-decoration:none;">
+            <i class="fa-solid fa-trophy"></i> Buat Event Resmi Venue
+        </a>
+    </div>
     <div class="openmatch-mobile-head">
         <div>
-            <h2>Manajemen Event & Open Match</h2>
+            <h2>Manajemen Open Match</h2>
         </div>
-        <button type="button" class="btn-ui btn-green" onclick="document.getElementById('openMatchForm').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-plus"></i> Buat Open Match</button>
+        <div style="display:flex; gap:8px;">
+            <a href="{{ route('admin.events.index') }}" class="btn-ui btn-gray" style="text-decoration:none;"><i class="fa-solid fa-trophy"></i> Event Resmi</a>
+            <button type="button" class="btn-ui btn-green" onclick="document.getElementById('openMatchForm').scrollIntoView({behavior:'smooth'})"><i class="fa-solid fa-plus"></i> Buat Open Match</button>
+        </div>
     </div>
 
     <div class="openmatch-filter-row">
@@ -34,7 +47,7 @@
         </div>
         <div class="form-group"><label>Booking Terkait</label><select class="select-ui" name="booking_id"><option value="">Tanpa booking terkait</option>@foreach($bookings as $booking)<option value="{{ $booking->id }}">{{ $booking->user?->name }} • {{ $booking->lapangan?->nama }} • {{ optional($booking->booking_date)->format('d M Y') }} {{ $booking->start_time }}-{{ $booking->end_time }}</option>@endforeach</select></div>
         <div class="form-group"><label>Deskripsi Tambahan</label><textarea class="textarea-ui" name="deskripsi" placeholder="Ketikkan detail lawan, level, aturan main, atau kebutuhan tambahan."></textarea></div>
-        <div style="display:flex; justify-content:flex-end;"><button class="btn-ui btn-green"><i class="fa-solid fa-paper-plane"></i> Publikasikan Event</button></div>
+        <div style="display:flex; justify-content:flex-end;"><button class="btn-ui btn-green"><i class="fa-solid fa-paper-plane"></i> Publikasikan Open Match</button></div>
     </form>
 
     <div class="openmatch-grid mobile-inspired mt-16">

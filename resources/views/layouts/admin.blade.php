@@ -7,6 +7,22 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="{{ asset('admin-ui.css') }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        @keyframes bellShake {
+            0%, 100% { transform: rotate(0); }
+            20%, 60% { transform: rotate(-15deg); }
+            40%, 80% { transform: rotate(15deg); }
+        }
+        .bell-shake i {
+            animation: bellShake 0.6s ease;
+            color: #10b981 !important;
+        }
+        .notif-badge.badge-bounce {
+            transform: scale(1.3);
+            transition: transform 0.3s ease;
+        }
+    </style>
     @yield('head')
 </head>
 <body>
@@ -61,7 +77,7 @@
             @endif
 
             @if($isVenueAdmin)
-                <a class="sidebar-link {{ request()->routeIs('user.venue-application*') ? 'active' : '' }}" href="{{ route('user.venue-application') }}"><span class="menu-icon"><i class="fa-solid fa-circle-plus"></i></span><span class="label">Daftarkan Venue Baru</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.venue-register*') ? 'active' : '' }}" href="{{ route('admin.venue-register') }}"><span class="menu-icon"><i class="fa-solid fa-circle-plus"></i></span><span class="label">Daftarkan Venue Baru</span></a>
                 <a class="sidebar-link {{ request()->routeIs('admin.venue-profile*') ? 'active' : '' }}" href="{{ route('admin.venue-profile') }}"><span class="menu-icon"><i class="fa-solid fa-store"></i></span><span class="label">Profil Venue</span></a>
                 <a class="sidebar-link {{ request()->routeIs('admin.venue-finance*') ? 'active' : '' }}" href="{{ route('admin.venue-finance') }}"><span class="menu-icon"><i class="fa-solid fa-wallet"></i></span><span class="label">Saldo & Penarikan</span></a>
             @endif
@@ -70,7 +86,7 @@
                 <span class="menu-icon"><i class="fa-solid fa-vector-square"></i></span>
                 <span class="label">Management Lapangan</span>
             </a>
-            @if($isSuperAdmin || $isVenueAdmin)
+            @if($isAdmin)
     <a class="sidebar-link {{ request()->routeIs('admin.bookings*') ? 'active' : '' }}"
        href="{{ route('admin.bookings') }}">
         <span class="menu-icon">
@@ -114,11 +130,25 @@
                 <span class="label">Export Laporan</span>
             </a>
 
+            @if($isAdmin)
+                <a class="sidebar-link {{ request()->routeIs('admin.openmatches*') ? 'active' : '' }}"
+                   href="{{ route('admin.openmatches') }}">
+                    <span class="menu-icon"><i class="fa-solid fa-users"></i></span>
+                    <span class="label">Open Match</span>
+                </a>
+
+                <a class="sidebar-link {{ request()->routeIs('admin.events.*') ? 'active' : '' }}"
+                   href="{{ route('admin.events.index') }}">
+                    <span class="menu-icon"><i class="fa-solid fa-calendar-days"></i></span>
+                    <span class="label">Manajemen Event</span>
+                </a>
+            @endif
+
             @if($isSuperAdmin)
-                <a class="sidebar-link {{ request()->routeIs('admin.control-center') || request()->routeIs('admin.events.*') || request()->routeIs('admin.openmatches*') ? 'active' : '' }}"
+                <a class="sidebar-link {{ request()->routeIs('admin.control-center') ? 'active' : '' }}"
                    href="{{ route('admin.control-center') }}">
                     <span class="menu-icon"><i class="fa-solid fa-sliders"></i></span>
-                    <span class="label">Kontrol Open Match & Event</span>
+                    <span class="label">Pusat Kendali</span>
                 </a>
             @endif
 
@@ -158,7 +188,12 @@
                     value="{{ request('q') }}"
                     placeholder="Search..."
                     data-global-search
+                    autocomplete="off"
                 >
+
+                <button type="button" id="adminSearchClear" aria-label="Hapus Pencarian" style="display: none; background: transparent; border: none; cursor: pointer; color: #94a3b8; padding: 0 8px; font-size: 14px;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
 
                 <button type="submit" aria-label="Search">
                     <i class="fa-solid fa-arrow-right"></i>
@@ -211,9 +246,14 @@
 
                 <a href="{{ route('admin.profile') }}" class="topbar-profile anim-click">
                     <div class="avatar avatar-photo">
-                        @if($adminUser?->profile_photo)
+                        @if($adminUser?->profile_photo_url)
                             <img
-                                src="{{ asset($adminUser->profile_photo) }}"
+                                src="{{ $adminUser->profile_photo_url }}"
+                                alt="{{ $adminUser->name ?? 'Admin' }}"
+                            >
+                        @elseif($adminUser?->profile_photo)
+                            <img
+                                src="{{ str_starts_with($adminUser->profile_photo, 'profiles/') ? asset('storage/'.$adminUser->profile_photo) : asset($adminUser->profile_photo) }}"
                                 alt="{{ $adminUser->name ?? 'Admin' }}"
                             >
                         @else
@@ -323,6 +363,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const searchInput = document.querySelector('[data-global-search]');
     const searchForm = document.getElementById('adminGlobalSearch');
+    const searchClear = document.getElementById('adminSearchClear');
 
     const localInputs = document.querySelectorAll(
         '[data-local-filter], [data-global-search]'
@@ -334,6 +375,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function applyFilter() {
         const q = normalize(searchInput?.value);
+        if (searchClear) {
+            searchClear.style.display = q ? 'inline-block' : 'none';
+        }
+
         const jenis = normalize(
             document.querySelector('[data-local-filter-select="jenis"]')?.value
         );
@@ -341,10 +386,14 @@ document.addEventListener('DOMContentLoaded', function () {
             document.querySelector('[data-local-filter-select="status"]')?.value
         );
 
-        document.querySelectorAll(
-            '[data-search-item], .data-table tbody tr, .court-card, ' +
-            '.reward-card, .review-card, .openmatch-card'
-        ).forEach(function (item) {
+        // Targetkan seluruh komponen tabel / kartu tanpa memecah row accordion perpanjangan
+        const items = document.querySelectorAll(
+            '[data-search-item], .data-table tbody tr:not([id^="extension-"]):not(.extension-row), ' +
+            '.marketplace-table tbody tr, .cc-table tbody tr, .cc-item, .court-card, ' +
+            '.reward-card, .review-card, .openmatch-card, .va-card, .event-card, .admin-event-card'
+        );
+
+        items.forEach(function (item) {
             const text = normalize(item.innerText);
             const matchText = !q || text.includes(q);
             const matchJenis = !jenis ||
@@ -354,8 +403,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 normalize(item.dataset.status).includes(status) ||
                 text.includes(status);
 
-            item.style.display =
-                (matchText && matchJenis && matchStatus) ? '' : 'none';
+            item.style.display = (matchText && matchJenis && matchStatus) ? '' : 'none';
+        });
+    }
+
+    if (searchClear && searchInput) {
+        searchClear.addEventListener('click', function () {
+            searchInput.value = '';
+            applyFilter();
+            searchInput.focus();
         });
     }
 
@@ -370,12 +426,98 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (searchForm) {
         searchForm.addEventListener('submit', function (event) {
-            event.preventDefault();
-            applyFilter();
+            const hasLocalItems = document.querySelectorAll(
+                '[data-search-item], .data-table tbody tr:not([id^="extension-"]), .marketplace-table tbody tr, .cc-item, .court-card, .reward-card, .review-card, .openmatch-card'
+            ).length > 0;
+
+            if (hasLocalItems) {
+                event.preventDefault();
+                applyFilter();
+            }
         });
     }
 
     applyFilter();
+
+    // Realtime Notifications Polling (setiap 6 detik)
+    let currentNotifCount = {{ (int) $totalNotificationCount }};
+    const notifToggleBtn = document.querySelector('[data-notification-toggle]');
+    const notifPanelList = document.querySelector('.notification-list');
+
+    function pollAdminNotifications() {
+        fetch('{{ route('admin.api.notifications') }}', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(function (data) {
+            const newCount = Number(data.totalCount || 0);
+
+            // Jika jumlah notifikasi bertambah, aktifkan efek lonceng bergetar
+            if (newCount > currentNotifCount && notifToggleBtn) {
+                notifToggleBtn.classList.remove('bell-shake');
+                void notifToggleBtn.offsetWidth;
+                notifToggleBtn.classList.add('bell-shake');
+            }
+
+            // Update badge notifikasi
+            let badge = notifToggleBtn ? notifToggleBtn.querySelector('.notif-badge') : null;
+            if (newCount > 0) {
+                if (!badge && notifToggleBtn) {
+                    badge = document.createElement('span');
+                    badge.className = 'notif-badge';
+                    notifToggleBtn.appendChild(badge);
+                }
+                if (badge) {
+                    badge.textContent = newCount;
+                    if (newCount > currentNotifCount) {
+                        badge.classList.add('badge-bounce');
+                        setTimeout(() => badge.classList.remove('badge-bounce'), 400);
+                    }
+                }
+            } else if (badge) {
+                badge.remove();
+            }
+
+            // Perbarui list notifikasi jika data items ada
+            if (notifPanelList && Array.isArray(data.notifications)) {
+                if (data.notifications.length === 0) {
+                    notifPanelList.innerHTML = '<div class="notification-empty">Belum ada notifikasi baru.</div>';
+                } else {
+                    let html = '';
+                    data.notifications.forEach(function (n) {
+                        const icon = n.icon || 'fa-solid fa-bell';
+                        const label = n.label || 'Notifikasi';
+                        const meta = n.meta || '';
+                        const time = n.time || '';
+                        const url = n.url || '#';
+
+                        html += '<a href="' + url + '" class="notification-item anim-click">' +
+                            '<div class="notification-icon"><i class="' + icon + '"></i></div>' +
+                            '<div class="notification-copy">' +
+                                '<strong>' + label + '</strong>' +
+                                '<span>' + meta + '</span>' +
+                            '</div>' +
+                            '<small>' + time + '</small>' +
+                        '</a>';
+                    });
+                    notifPanelList.innerHTML = html;
+                }
+            }
+
+            currentNotifCount = newCount;
+        })
+        .catch(function (err) {
+            // Silently fail on connection drop
+        });
+    }
+
+    setInterval(pollAdminNotifications, 6000);
 
     document.querySelectorAll('[data-slider]').forEach(function (slider) {
         const slides = Array.from(slider.querySelectorAll('.slide-photo'));

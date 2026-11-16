@@ -16,48 +16,12 @@
 </style>
 <div class="om-page">
 
-{{-- EVENT ARENASPORTS --}}
-<div class="panel-card" style="margin-bottom:24px">
-    <div class="panel-title">Event ArenaSports</div>
-
-    @forelse ($events as $event)
-        <article style="padding:18px;margin-top:14px;border:1px solid #e0ece3;border-radius:12px">
-            <h3>{{ $event->title }}</h3>
-
-            <p><strong>Jenis:</strong> {{ $event->jenis }}</p>
-
-            <p>
-                <strong>Tanggal:</strong>
-                {{ \Illuminate\Support\Carbon::parse($event->tanggal)->format('d/m/Y') }}
-            </p>
-
-            <p>
-                <strong>Waktu:</strong>
-                {{ $event->start_time ?: 'Belum ditentukan' }}
-                @if ($event->end_time)
-                    – {{ $event->end_time }}
-                @endif
-            </p>
-
-            <p><strong>Lokasi:</strong> {{ $event->lokasi }}</p>
-            <p><strong>Kuota:</strong> {{ $event->kuota }} peserta</p>
-
-            @if ($event->deskripsi)
-                <p>{{ $event->deskripsi }}</p>
-            @endif
-        </article>
-    @empty
-        <p>Belum ada Event yang dipublikasikan.</p>
-    @endforelse
-</div>
-
 {{-- JUDUL HALAMAN --}}
 <div class="u-section-head">
     <div>
-        <h2>Open Match &amp; Event</h2>
+        <h2>Open Match Komunitas</h2>
         <p>
-            Open Match dibuat oleh pengguna.
-            Event resmi diterbitkan oleh Admin/Superadmin.
+            Cari kawan tanding dan sparing seru yang dibuat oleh komunitas pemain ArenaSports.
         </p>
     </div>
 </div>
@@ -308,47 +272,94 @@
     @endforelse
 </div>
 
-{{-- EVENT RESMI --}}
-<h3 style="margin-top:28px">Event resmi ArenaSports</h3>
+{{-- EVENT RESMI VENUE ADMIN --}}
+<div class="u-section-head" style="margin-top:42px; margin-bottom:16px;">
+    <div>
+        <h2 style="display:flex; align-items:center; gap:10px;">
+            <i class="fa-solid fa-trophy" style="color:#168653;"></i> Event & Turnamen Resmi
+        </h2>
+        <p>
+            Daftar kompetisi dan turnamen olahraga resmi yang diselenggarakan langsung oleh pengelola venue rekanan ArenaSports.
+        </p>
+    </div>
+</div>
 
 <div class="u-cards">
     @forelse ($events as $event)
-
-        <article class="u-card">
+        @php
+            $venueName = $event->creator?->venue?->name ?? ($event->creator?->name ?? 'Venue Partner');
+            $venuePhone = $event->creator?->venue?->contact_phone ?? $event->creator?->phone;
+            $cleanPhone = $venuePhone ? preg_replace('/[^0-9]/', '', $venuePhone) : null;
+            if ($cleanPhone && str_starts_with($cleanPhone, '0')) {
+                $cleanPhone = '62' . substr($cleanPhone, 1);
+            }
+        @endphp
+        <article class="u-card" style="border-top: 4px solid #168653; display:flex; flex-direction:column; justify-content:space-between;">
             <div class="u-card-body">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px;">
+                    <span class="u-tag" style="background:#e8f7ec; color:#146c43; font-weight:800; border:1px solid #c3e6cb; font-size:11px;">
+                        <i class="fa-solid fa-shield-halved"></i> Event Resmi Venue
+                    </span>
+                    <span class="u-tag">{{ $event->jenis }}</span>
+                </div>
 
-                <span class="u-tag">{{ $event->jenis }}</span>
+                <h3 style="font-size:17px; margin-bottom:12px; color:#143e26;">{{ $event->title }}</h3>
 
-                <h3>{{ $event->title }}</h3>
-
-                <p class="u-meta">
-                    {{ $event->tanggal?->format('d M Y') }}
-                    · {{ $event->start_time ?? 'Waktu menyusul' }}
-                </p>
-
-                <p class="u-meta">
-                    <i class="fa-solid fa-location-dot"></i>
-                    {{ $event->lokasi }}
-                </p>
+                <div class="om-detail" style="margin:12px 0;">
+                    <span>
+                        <i class="fa-regular fa-calendar"></i>
+                        <div>
+                            <strong>{{ $event->tanggal?->format('d M Y') }}</strong><br>
+                            <small style="color:#718078;">{{ $event->start_time ? substr($event->start_time, 0, 5) : '08:00' }} - {{ $event->end_time ? substr($event->end_time, 0, 5) : 'Selesai' }} WIB</small>
+                        </div>
+                    </span>
+                    <span>
+                        <i class="fa-solid fa-location-dot"></i>
+                        <div>
+                            <strong>Lokasi Venue</strong><br>
+                            <small style="color:#718078;">{{ $event->lokasi }}</small>
+                        </div>
+                    </span>
+                    <span>
+                        <i class="fa-solid fa-users"></i>
+                        <div>
+                            <strong>Kuota Peserta</strong><br>
+                            <small style="color:#718078;">{{ $event->kuota }} peserta / slot tim</small>
+                        </div>
+                    </span>
+                    <span>
+                        <i class="fa-solid fa-store"></i>
+                        <div>
+                            <strong>Penyelenggara</strong><br>
+                            <small style="color:#718078;">{{ $venueName }}</small>
+                        </div>
+                    </span>
+                </div>
 
                 @if ($event->deskripsi)
-                    <p>{{ $event->deskripsi }}</p>
+                    <div style="background:#f8faf9; padding:12px 14px; border-radius:10px; font-size:12px; color:#4a5c52; line-height:1.6; margin-bottom:14px; border-left:3px solid #168653;">
+                        {{ $event->deskripsi }}
+                    </div>
                 @endif
+            </div>
 
-                <span class="u-meta">
-                    Kuota {{ $event->kuota }} peserta ·
-                    Hubungi penyelenggara untuk konfirmasi keikutsertaan.
+            <div style="padding:14px 18px; background:#fbfdfc; border-top:1px solid #edf4f0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <span style="font-size:11px; color:#62796e;">
+                    <i class="fa-solid fa-circle-check" style="color:#168653;"></i> Registrasi langsung via Venue
                 </span>
-
+                @if($cleanPhone)
+                    <a href="https://wa.me/{{ $cleanPhone }}?text={{ urlencode('Halo ' . $venueName . ', saya ingin bertanya seputar event: ' . $event->title) }}" target="_blank" class="u-btn u-btn-green" style="padding:8px 14px; font-size:12px; text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                        <i class="fa-brands fa-whatsapp"></i> Hubungi Penyelenggara
+                    </a>
+                @endif
             </div>
         </article>
-
     @empty
-
-        <div class="u-panel u-empty">
-            Belum ada event resmi yang dipublikasikan Admin/Superadmin.
+        <div class="u-panel u-empty" style="grid-column:1/-1; padding:32px 20px; text-align:center;">
+            <i class="fa-solid fa-trophy" style="font-size:36px; color:#95b4a2; margin-bottom:10px; display:inline-block;"></i>
+            <p style="font-size:14px; font-weight:600; color:#42584c; margin:0 0 4px;">Belum ada event resmi yang dipublikasikan saat ini.</p>
+            <small style="color:#788f83;">Event turnamen terbaru dari Venue Admin rekanan akan ditampilkan di sini.</small>
         </div>
-
     @endforelse
 </div>
 

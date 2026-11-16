@@ -64,4 +64,30 @@ class UserNotificationController extends Controller
             'Semua notifikasi sudah ditandai dibaca.'
         );
     }
+
+    public function apiNotifications(Request $request)
+    {
+        $userId = $request->session()->get('admin_user_id');
+        $user = $userId ? User::find($userId) : null;
+        if (!$user) {
+            return response()->json(['unreadCount' => 0, 'notifications' => []]);
+        }
+
+        $unreadCount = $user->unreadNotifications()->count();
+        $notifications = $user->notifications()->latest()->take(6)->get()->map(function ($n) {
+            return [
+                'id' => $n->id,
+                'title' => $n->data['title'] ?? 'Notifikasi ArenaSports',
+                'message' => $n->data['message'] ?? '',
+                'time' => optional($n->created_at)->diffForHumans(),
+                'is_read' => $n->read_at !== null,
+                'read_url' => route('user.notifications.read', $n->id),
+            ];
+        });
+
+        return response()->json([
+            'unreadCount' => $unreadCount,
+            'notifications' => $notifications,
+        ]);
+    }
 }

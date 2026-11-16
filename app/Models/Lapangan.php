@@ -50,4 +50,27 @@ class Lapangan extends Model
     {
         return $this->hasMany(Review::class, 'lapangan_id');
     }
+
+    public function getFotoUrlAttribute(): ?string
+    {
+        if (! $this->foto) {
+            return null;
+        }
+
+        $photo = trim($this->foto);
+        if (preg_match('/^https?:\/\//i', $photo)) {
+            return $photo;
+        }
+
+        $path = ltrim($photo, '/');
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
+            return asset('storage/' . $path);
+        }
+
+        return asset($path);
+    }
 }

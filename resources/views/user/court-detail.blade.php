@@ -343,6 +343,86 @@
 
 </div>
 
+{{-- ========================================= --}}
+{{-- ULASAN & KOMENTAR PENGGUNA --}}
+{{-- ========================================= --}}
+@php
+    $reviews = $lapangan->reviews ?? collect();
+    $avgRating = $reviews->count() > 0 ? round($reviews->avg('rating'), 1) : round($lapangan->rating ?? 5.0, 1);
+@endphp
+
+<div class="u-card" style="margin-top:28px; padding:24px 28px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px; border-bottom:1px solid #e5ede7; padding-bottom:16px;">
+        <div>
+            <h3 style="margin:0 0 6px; font-size:20px; color:#143e26; display:flex; align-items:center; gap:8px;">
+                <i class="fa-solid fa-comments" style="color:#168653;"></i>
+                Ulasan &amp; Penilaian Pemain
+            </h3>
+            <p style="margin:0; color:#62796e; font-size:13px;">
+                Pengalaman nyata dari para pemain yang pernah menyewa {{ $lapangan->nama }}.
+            </p>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:12px; background:#f0faf3; border:1px solid #cce8d5; border-radius:14px; padding:10px 18px;">
+            <div style="font-size:28px; font-weight:850; color:#14532d; line-height:1;">
+                ★ {{ number_format($avgRating, 1) }}
+            </div>
+            <div style="font-size:12px; color:#476554;">
+                <div style="color:#f59e0b; font-size:13px;">
+                    @for($s = 1; $s <= 5; $s++)
+                        <i class="fa-{{ $s <= round($avgRating) ? 'solid' : 'regular' }} fa-star"></i>
+                    @endfor
+                </div>
+                <span>Berdasarkan {{ $reviews->count() }} ulasan</span>
+            </div>
+        </div>
+    </div>
+
+    @forelse($reviews as $rev)
+        <div style="padding:16px 0; border-bottom:1px solid #f1f5f2; display:flex; gap:16px; align-items:flex-start;">
+            <div style="width:44px; height:44px; border-radius:50%; background:#168653; color:#fff; display:grid; place-items:center; font-weight:750; font-size:16px; flex-shrink:0;">
+                {{ strtoupper(substr($rev->user?->name ?? 'P', 0, 1)) }}
+            </div>
+
+            <div style="flex:1; min-width:0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:4px;">
+                    <strong style="color:#163e28; font-size:14px;">{{ $rev->user?->name ?? 'Pemain ArenaSports' }}</strong>
+                    <small style="color:#8ca295; font-size:11px;">
+                        <i class="fa-regular fa-clock"></i> {{ $rev->created_at?->diffForHumans() ?? '-' }}
+                    </small>
+                </div>
+
+                <div style="color:#f59e0b; font-size:12px; margin-bottom:6px;">
+                    @for($i = 1; $i <= 5; $i++)
+                        <i class="fa-{{ $i <= (int)$rev->rating ? 'solid' : 'regular' }} fa-star"></i>
+                    @endfor
+                    <span style="color:#506a5a; font-weight:700; margin-left:6px; font-size:11px;">({{ $rev->rating }}/5)</span>
+                </div>
+
+                <p style="margin:0 0 8px; color:#364e41; font-size:13px; line-height:1.6;">
+                    {{ $rev->message }}
+                </p>
+
+                @if($rev->reply_message)
+                    <div style="background:#f4faf6; border-left:3px solid #168653; padding:10px 14px; border-radius:8px; margin-top:8px;">
+                        <strong style="color:#166534; font-size:12px; display:block; margin-bottom:3px;">
+                            <i class="fa-solid fa-reply"></i> Tanggapan Pengelola Venue:
+                        </strong>
+                        <p style="margin:0; font-size:12px; color:#476554; line-height:1.5;">
+                            {{ $rev->reply_message }}
+                        </p>
+                    </div>
+                @endif
+            </div>
+        </div>
+    @empty
+        <div style="text-align:center; padding:35px 20px; color:#789283;">
+            <i class="fa-regular fa-comment-dots" style="font-size:36px; color:#a3b8ac; margin-bottom:10px; display:inline-block;"></i>
+            <p style="font-size:14px; font-weight:600; margin:0 0 4px; color:#395043;">Belum ada ulasan untuk lapangan ini.</p>
+            <small style="font-size:12px;">Jadilah yang pertama memberikan penilaian setelah selesai bermain!</small>
+        </div>
+    @endforelse
+</div>
 
 {{-- ========================================= --}}
 {{-- JAVASCRIPT --}}

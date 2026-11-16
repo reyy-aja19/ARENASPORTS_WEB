@@ -421,7 +421,7 @@
                     <img
                         id="venue-photo-preview"
                         class="venue-photo-preview"
-                        src="{{ asset($venue->photo) }}"
+                        src="{{ $venue->photo_url ?? asset($venue->photo) }}"
                         alt="Foto {{ $venue->name }}"
                     >
                 @else

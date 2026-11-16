@@ -8,7 +8,7 @@
     @csrf
     <div class="profile-top">
         <div class="profile-photo preview-shell has-image">
-            <img id="admin-photo-preview" src="{{ $profile->profile_photo ? asset($profile->profile_photo) : $fallbackAdminPhoto }}" alt="{{ $profile->name }}">
+            <img id="admin-photo-preview" src="{{ $profile->profile_photo_url ?? ($profile->profile_photo ? (str_starts_with($profile->profile_photo, 'profiles/') ? asset('storage/'.$profile->profile_photo) : asset($profile->profile_photo)) : $fallbackAdminPhoto) }}" alt="{{ $profile->name }}">
         </div>
         <div style="font-size:28px; font-weight:700;">Profil Admin</div>
         <div class="muted" style="margin-top:4px;">Foto admin bisa diganti langsung dari panel ini.</div>

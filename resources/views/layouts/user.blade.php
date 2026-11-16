@@ -7,6 +7,22 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="{{ asset('user-ui.css') }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        @keyframes userBellShake {
+            0%, 100% { transform: rotate(0); }
+            20%, 60% { transform: rotate(-15deg); }
+            40%, 80% { transform: rotate(15deg); }
+        }
+        .u-bell-shake i {
+            animation: userBellShake 0.6s ease;
+            color: #178653 !important;
+        }
+        .u-badge-bounce {
+            transform: scale(1.3);
+            transition: transform 0.3s ease;
+        }
+    </style>
 </head>
 
 <body class="user-body">
@@ -100,42 +116,43 @@
                         <a href="{{ route('user.notifications') }}">Lihat semua</a>
                     </div>
 
-                    @forelse($user->notifications()->latest()->take(5)->get() as $notification)
+                    <div id="uNotifItemsContainer">
+                        @forelse($user->notifications()->latest()->take(5)->get() as $notification)
 
-                        <form method="POST"
-                              action="{{ route('user.notifications.read', $notification->id) }}"
-                              class="u-notif-item {{ $notification->read_at ? '' : 'unread' }}">
+                            <form method="POST"
+                                  action="{{ route('user.notifications.read', $notification->id) }}"
+                                  class="u-notif-item {{ $notification->read_at ? '' : 'unread' }}">
 
-                            @csrf
+                                @csrf
 
-                            <button type="submit">
+                                <button type="submit">
 
-                                <strong>
-                                    {{ $notification->data['title'] ?? 'Notifikasi ArenaSports' }}
-                                </strong>
+                                    <strong>
+                                        {{ $notification->data['title'] ?? 'Notifikasi ArenaSports' }}
+                                    </strong>
 
-                                <span>
-                                    {{ $notification->data['message'] ?? '' }}
-                                </span>
+                                    <span>
+                                        {{ $notification->data['message'] ?? '' }}
+                                    </span>
 
-                                <small>
-                                    {{ $notification->created_at?->diffForHumans() }}
-                                </small>
+                                    <small>
+                                        {{ $notification->created_at?->diffForHumans() }}
+                                    </small>
 
-                            </button>
+                                </button>
 
-                        </form>
+                            </form>
 
-                    @empty
+                        @empty
 
-                        <div class="u-notif-empty">
-                            Belum ada notifikasi.
-                        </div>
+                            <div class="u-notif-empty">
+                                Belum ada notifikasi.
+                            </div>
 
-                    @endforelse
+                        @endforelse
+                    </div>
 
-                    @if($user->unreadNotifications()->exists())
-
+                    <div id="uNotifMarkAllWrap" style="{{ $user->unreadNotifications()->exists() ? '' : 'display:none;' }}">
                         <form method="POST"
                               action="{{ route('user.notifications.read-all') }}">
 
@@ -146,8 +163,7 @@
                             </button>
 
                         </form>
-
-                    @endif
+                    </div>
 
                 </div>
 
@@ -348,11 +364,13 @@
 </footer>
 
 
-{{-- SCRIPT NOTIFIKASI --}}
+{{-- SCRIPT NOTIFIKASI REALTIME --}}
 <script>
 (() => {
     const button = document.getElementById('uNotifToggle');
     const menu = document.getElementById('uNotifMenu');
+    const itemsContainer = document.getElementById('uNotifItemsContainer');
+    const markAllWrap = document.getElementById('uNotifMarkAllWrap');
 
     if (!button || !menu) return;
 
@@ -365,6 +383,83 @@
             menu.hidden = true;
         }
     });
+
+    @if($user ?? false)
+    let currentUserNotifCount = {{ (int) $user->unreadNotifications()->count() }};
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+    function pollUserNotifications() {
+        fetch('{{ route('user.api.notifications') }}', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+        })
+        .then(data => {
+            const count = Number(data.unreadCount || 0);
+
+            // Jika ada notifikasi baru masuk, berikan efek visual lonceng bergetar
+            if (count > currentUserNotifCount) {
+                button.classList.remove('u-bell-shake');
+                void button.offsetWidth;
+                button.classList.add('u-bell-shake');
+            }
+
+            // Perbarui badge
+            let badge = button.querySelector('.u-notif-badge');
+            if (count > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'u-notif-badge';
+                    button.appendChild(badge);
+                }
+                badge.textContent = count;
+                if (count > currentUserNotifCount) {
+                    badge.classList.add('u-badge-bounce');
+                    setTimeout(() => badge.classList.remove('u-badge-bounce'), 400);
+                }
+                if (markAllWrap) markAllWrap.style.display = '';
+            } else {
+                if (badge) badge.remove();
+                if (markAllWrap) markAllWrap.style.display = 'none';
+            }
+
+            // Perbarui daftar dropdown items
+            if (itemsContainer && Array.isArray(data.notifications)) {
+                if (data.notifications.length === 0) {
+                    itemsContainer.innerHTML = '<div class="u-notif-empty">Belum ada notifikasi.</div>';
+                } else {
+                    let html = '';
+                    data.notifications.forEach(n => {
+                        const unreadClass = n.is_read ? '' : 'unread';
+                        html += `
+                        <form method="POST" action="${n.read_url}" class="u-notif-item ${unreadClass}">
+                            <input type="hidden" name="_token" value="${csrfToken}">
+                            <button type="submit">
+                                <strong>${n.title || 'Notifikasi ArenaSports'}</strong>
+                                <span>${n.message || ''}</span>
+                                <small>${n.time || ''}</small>
+                            </button>
+                        </form>`;
+                    });
+                    itemsContainer.innerHTML = html;
+                }
+            }
+
+            currentUserNotifCount = count;
+        })
+        .catch(err => {
+            // Silently fail on connection drop
+        });
+    }
+
+    // Polling setiap 6 detik
+    setInterval(pollUserNotifications, 6000);
+    @endif
 })();
 </script>
 
