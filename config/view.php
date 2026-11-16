@@ -1,4 +1,3 @@
-
 <?php
 
 return [
@@ -9,7 +8,7 @@ return [
 
     'compiled' => env(
         'VIEW_COMPILED_PATH',
-        storage_path('framework/views')
+        realpath(storage_path('framework/views'))
     ),
 
 ];
