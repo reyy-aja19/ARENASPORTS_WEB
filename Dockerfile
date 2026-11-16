@@ -34,6 +34,8 @@ WORKDIR /var/www/html
 
 # Copy file project
 COPY . .
+RUN rm -f .env
+
 
 # Install dependencies Laravel
 RUN composer install --optimize-autoloader --no-dev
@@ -58,4 +60,5 @@ RUN mkdir -p /var/www/html/storage/framework/sessions \
     && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["sh", "-c", "php artisan config:clear && php artisan cache:clear && /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
+
