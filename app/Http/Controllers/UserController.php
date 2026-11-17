@@ -38,7 +38,7 @@ class UserController extends Controller
     private function optionalUser(Request $request): ?User
     {
         return User::whereKey($request->session()->get('admin_user_id'))
-            ->where('role', 'user')
+            ->whereIn('role', ['user', 'venue_admin'])
             ->where('status', 'Aktif')
             ->first();
     }
@@ -70,6 +70,29 @@ class UserController extends Controller
     public function home(Request $request): View
     {
         $user = $this->currentUser($request);
+
+        // Jika akun memiliki pengajuan venue yang masih diproses
+        $pendingVenueApp = \App\Models\VenueApplication::where('user_id', $user->id)
+            ->whereIn('status', ['pending', 'revision', 'Menunggu', 'Perlu Revisi'])
+            ->latest()
+            ->first();
+
+        // Jadwal booking mendatang terdekat (aktif)
+        $upcomingBooking = Booking::with(['lapangan.venue'])
+            ->where('user_id', $user->id)
+            ->whereIn('status', ['DP', 'Lunas'])
+            ->whereDate('booking_date', '>=', today())
+            ->orderBy('booking_date')
+            ->orderBy('start_time')
+            ->first();
+
+        // Event resmi terbaru dari Venue Admin
+        $upcomingEvents = Event::with('creator.venue')
+            ->where('status', 'Publikasi')
+            ->whereDate('tanggal', '>=', today())
+            ->orderBy('tanggal')
+            ->take(3)
+            ->get();
 
         $courts = Lapangan::where('status', 'Tersedia')
             ->latest()
@@ -104,7 +127,10 @@ class UserController extends Controller
             'venues',
             'venueCount',
             'bookings',
-            'matches'
+            'matches',
+            'pendingVenueApp',
+            'upcomingBooking',
+            'upcomingEvents'
         ));
     }
 
@@ -707,19 +733,33 @@ public function courts(Request $request): View
         OpenMatch $openMatch,
         User $user
     ): void {
-        $hostId = (int) Booking::whereKey(
-            $openMatch->booking_id
-        )->value('user_id');
+        if ($user->role === 'superadmin') {
+            return;
+        }
+
+        $openMatch->loadMissing('booking.lapangan.venue');
+
+        $isCourtOwner = false;
+        if ($openMatch->booking?->lapangan) {
+            $court = $openMatch->booking->lapangan;
+            $isCourtOwner = ((int) $court->owner_admin_id === (int) $user->id)
+                || ((int) ($court->venue?->owner_admin_id ?? 0) === (int) $user->id);
+        }
+
+        $hostId = (int) ($openMatch->booking?->user_id ?? 0);
 
         $isParticipant = DB::table('open_match_participants')
             ->where('open_match_id', $openMatch->id)
             ->where('user_id', $user->id)
             ->exists();
 
+        // Jika match dibuat oleh admin tanpa booking, atau venue_admin adalah pembuat / pengelola
+        $isMatchAdmin = ($user->role === 'venue_admin' && ($isCourtOwner || empty($openMatch->booking_id)));
+
         abort_unless(
-            $hostId === (int) $user->id || $isParticipant,
+            $hostId === (int) $user->id || $isParticipant || $isCourtOwner || $isMatchAdmin,
             403,
-            'Obrolan hanya untuk pembuat pertandingan dan pemain yang sudah bergabung.'
+            'Obrolan hanya untuk pembuat pertandingan, pemain yang sudah bergabung, atau pengelola venue.'
         );
     }
 
@@ -729,7 +769,7 @@ public function courts(Request $request): View
     ): View {
         $user = $this->currentUser($request);
 
-        abort_unless($user->role === 'user', 403);
+        abort_unless(in_array($user->role, ['user', 'venue_admin', 'superadmin'], true), 403);
 
         $this->ensureOpenMatchChatAccess($openMatch, $user);
 
@@ -753,7 +793,7 @@ public function courts(Request $request): View
     ) {
         $user = $this->currentUser($request);
 
-        abort_unless($user->role === 'user', 403);
+        abort_unless(in_array($user->role, ['user', 'venue_admin', 'superadmin'], true), 403);
 
         $this->ensureOpenMatchChatAccess($openMatch, $user);
 
@@ -787,7 +827,7 @@ public function courts(Request $request): View
     ): RedirectResponse {
         $user = $this->currentUser($request);
 
-        abort_unless($user->role === 'user', 403);
+        abort_unless(in_array($user->role, ['user', 'venue_admin', 'superadmin'], true), 403);
 
         $this->ensureOpenMatchChatAccess($openMatch, $user);
 
@@ -1193,13 +1233,27 @@ public function courts(Request $request): View
             'message' => ['required', 'string', 'max:1500'],
         ]);
 
-        Review::updateOrCreate(
+        $review = Review::updateOrCreate(
             [
                 'user_id' => $user->id,
                 'lapangan_id' => $booking->lapangan_id,
             ],
             $data
         );
+
+        // Notifikasi ke pemilik venue / superadmin jika ada review baru
+        $booking->loadMissing('lapangan.venue');
+        $venueOwnerId = $booking->lapangan?->owner_admin_id ?? $booking->lapangan?->venue?->owner_admin_id;
+        if ($venueOwnerId) {
+            $venueAdmin = User::find($venueOwnerId);
+            if ($venueAdmin) {
+                $venueAdmin->notify(new ArenaUserNotification(
+                    'Ulasan Baru Diterima',
+                    $user->name . ' memberikan rating ' . $data['rating'] . '/5 untuk lapangan ' . ($booking->lapangan?->nama ?? 'Lapangan') . ': "' . \Illuminate\Support\Str::limit($data['message'], 60) . '"',
+                    route('admin.reviews', [], false)
+                ));
+            }
+        }
 
         return back()->with(
             'success',

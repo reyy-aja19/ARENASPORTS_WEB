@@ -262,22 +262,18 @@
                 </div>
 
 
-                {{-- DURASI --}}
+                {{-- JAM SELESAI / DURASI --}}
                 <div class="u-field">
-                    <label>Durasi</label>
+                    <label>Sampai Jam (Jam Selesai)</label>
 
-                    <select id="booking-hours" name="hours">
-                        @for($i = 1; $i <= 8; $i++)
-                            <option
-                                value="{{ $i }}"
-                                @selected(old('hours', $bookingDraft['hours'] ?? 1) == $i)>
-                                {{ $i }} jam
-                            </option>
-                        @endfor
+                    <select id="booking-end-time">
+                        {{-- Opsi jam selesai diisi secara dinamis sesuai jam mulai --}}
                     </select>
 
+                    <input type="hidden" id="booking-hours" name="hours" value="{{ old('hours', $bookingDraft['hours'] ?? 1) }}">
+
                     <small id="booking-end-display">
-                        Jam selesai dihitung otomatis.
+                        Pilih jam mulai dan jam selesai bermain.
                     </small>
                 </div>
 
@@ -440,6 +436,7 @@
     const dateInput = document.getElementById('booking-date');
     const startInput = document.getElementById('booking-start');
     const hoursInput = document.getElementById('booking-hours');
+    const endTimeSelect = document.getElementById('booking-end-time');
     const grid = document.getElementById('availability-grid');
     const endDisplay = document.getElementById('booking-end-display');
 
@@ -447,7 +444,7 @@
         '.u-form button[type="submit"]'
     );
 
-    if (!dateInput || !startInput || !hoursInput || !grid) {
+    if (!dateInput || !startInput || !hoursInput || !endTimeSelect || !grid) {
         return;
     }
 
@@ -461,8 +458,16 @@
 
     // Mengubah format HH:mm menjadi menit.
     function toMinutes(time) {
+        if (!time) return 0;
         const [hour, minute] = time.substring(0, 5).split(':').map(Number);
         return hour * 60 + minute;
+    }
+
+    // Format menit ke string HH:mm
+    function formatTime(minutes) {
+        const hour = String(Math.floor(minutes / 60)).padStart(2, '0');
+        const minute = String(minutes % 60).padStart(2, '0');
+        return `${hour}:${minute}`;
     }
 
     // Memeriksa apakah dua rentang waktu saling berbenturan.
@@ -492,6 +497,44 @@
         const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
         return start <= currentMinutes;
+    }
+
+    // Perbarui opsi dropdown Jam Selesai berdasarkan Jam Mulai
+    function updateEndTimeOptions() {
+        if (!startInput.value) {
+            endTimeSelect.innerHTML = '<option value="">Pilih jam mulai terlebih dahulu</option>';
+            return;
+        }
+
+        const currentStartMin = toMinutes(startInput.value);
+        const prevSelectedHours = Number(hoursInput.value) || 1;
+        let selectedFound = false;
+
+        endTimeSelect.innerHTML = '';
+
+        for (let h = 1; h <= 8; h++) {
+            const endMin = currentStartMin + h * 60;
+            if (endMin > closing) break;
+
+            const timeStr = formatTime(endMin);
+            const opt = document.createElement('option');
+            opt.value = h;
+            opt.textContent = `${timeStr} (${h} jam bermain)`;
+
+            if (h === prevSelectedHours) {
+                opt.selected = true;
+                selectedFound = true;
+            }
+
+            endTimeSelect.appendChild(opt);
+        }
+
+        if (!selectedFound && endTimeSelect.options.length > 0) {
+            endTimeSelect.options[0].selected = true;
+            hoursInput.value = endTimeSelect.options[0].value;
+        } else if (selectedFound) {
+            hoursInput.value = prevSelectedHours;
+        }
     }
 
     // Memeriksa apakah rentang booking yang dipilih valid.
@@ -553,19 +596,18 @@
     function render() {
         grid.innerHTML = '';
 
+        const currentStartMin = startInput.value ? toMinutes(startInput.value) : -1;
+        const currentEndMin = currentStartMin >= 0 ? currentStartMin + (Number(hoursInput.value) || 1) * 60 : -1;
+
         for (let start = opening; start < closing; start += 60) {
             const end = start + 60;
+            const time = formatTime(start);
 
-            const hour = String(Math.floor(start / 60)).padStart(2, '0');
-            const minute = String(start % 60).padStart(2, '0');
-            const time = `${hour}:${minute}`;
-
-            // Warna merah hanya jika slot satu jam ini benar-benar dipesan.
             const booked = isBooked(start, end);
             const past = isPast(start);
+            const isSelectedRange = currentStartMin >= 0 && start >= currentStartMin && start < currentEndMin;
 
             const btn = document.createElement('button');
-
             btn.type = 'button';
             btn.textContent = time;
 
@@ -574,26 +616,29 @@
             let textColor;
 
             if (booked) {
-                // Merah: sudah dipesan.
                 borderColor = '#dc2626';
                 backgroundColor = '#fee2e2';
                 textColor = '#991b1b';
                 btn.disabled = true;
                 btn.title = 'Waktu ini sudah dipesan';
             } else if (past) {
-                // Abu-abu: waktu sudah berlalu.
                 borderColor = '#d1d5db';
                 backgroundColor = '#f3f4f6';
                 textColor = '#9ca3af';
                 btn.disabled = true;
                 btn.title = 'Waktu sudah berlalu';
+            } else if (isSelectedRange) {
+                borderColor = '#15803d';
+                backgroundColor = '#bbf7d0';
+                textColor = '#14532d';
+                btn.disabled = false;
+                btn.title = 'Termasuk dalam jam bermain yang kamu pilih';
             } else {
-                // Hijau: slot satu jam ini belum dipesan.
                 borderColor = '#16a34a';
                 backgroundColor = '#dcfce7';
                 textColor = '#166534';
                 btn.disabled = false;
-                btn.title = 'Pilih jam mulai ini';
+                btn.title = 'Klik untuk pilih jam mulai';
             }
 
             btn.style.cssText = `
@@ -603,13 +648,14 @@
                 background: ${backgroundColor};
                 color: ${textColor};
                 cursor: ${btn.disabled ? 'not-allowed' : 'pointer'};
-                font-weight: 600;
+                font-weight: 700;
+                transition: all .2s ease;
             `;
 
             if (!btn.disabled) {
                 btn.addEventListener('click', () => {
                     startInput.value = time;
-
+                    updateEndTimeOptions();
                     render();
                     updateEnd();
                 });
@@ -628,31 +674,21 @@
     function updateEnd() {
         if (!startInput.value) {
             endDisplay.textContent = 'Silakan pilih jam mulai.';
-
-            if (submitButton) {
-                submitButton.disabled = loading;
-            }
-
+            if (submitButton) submitButton.disabled = loading;
             return;
         }
 
         const start = toMinutes(startInput.value);
         const end = start + Number(hoursInput.value) * 60;
-
-        const endHour = String(Math.floor(end / 60)).padStart(2, '0');
-        const endMinute = String(end % 60).padStart(2, '0');
+        const endTimeStr = formatTime(end);
 
         const result = validateSelection();
 
         if (result.valid) {
-            endDisplay.textContent =
-                `Jam selesai: ${endHour}:${endMinute} — ${result.message}`;
-
+            endDisplay.textContent = `Bermain dari jam ${startInput.value} sampai ${endTimeStr} (${hoursInput.value} jam) — ${result.message}`;
             endDisplay.style.color = '#15803d';
         } else {
-            endDisplay.textContent =
-                `Jam selesai: ${endHour}:${endMinute} — ${result.message}`;
-
+            endDisplay.textContent = `Bermain dari jam ${startInput.value} sampai ${endTimeStr} (${hoursInput.value} jam) — ${result.message}`;
             endDisplay.style.color = '#dc2626';
         }
 
@@ -693,6 +729,7 @@
 
             loading = false;
 
+            updateEndTimeOptions();
             render();
             updateEnd();
 
@@ -717,14 +754,16 @@
         load();
     });
 
-    // Event ketika durasi berubah.
-    hoursInput.addEventListener('change', () => {
+    // Event ketika jam selesai (dropdown) diubah oleh user.
+    endTimeSelect.addEventListener('change', () => {
+        hoursInput.value = endTimeSelect.value;
         render();
         updateEnd();
     });
 
     // Event ketika jam mulai diubah secara manual.
     startInput.addEventListener('change', () => {
+        updateEndTimeOptions();
         render();
         updateEnd();
     });

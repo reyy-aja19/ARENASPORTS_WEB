@@ -28,6 +28,11 @@ class RoleMiddleware
         }
 
         if (!in_array($role, $roles, true)) {
+            // Jika user adalah venue_admin dan mencoba mengakses area user biasa, izinkan (dual mode)
+            if ($role === 'venue_admin' && in_array('user', $roles, true)) {
+                return $next($request);
+            }
+
             abort(403, 'Anda tidak memiliki akses ke halaman ini.');
         }
 

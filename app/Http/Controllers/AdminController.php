@@ -111,20 +111,29 @@ class AdminController extends Controller
     {
         $query = Lapangan::query();
         if (! $this->isSuperadmin($request)) {
-            $query->where('owner_admin_id', $request->session()->get('admin_user_id'));
+            $userId = $request->session()->get('admin_user_id');
+            $query->where(function ($q) use ($userId) {
+                $q->where('owner_admin_id', $userId)
+                  ->orWhereHas('venue', fn ($v) => $v->where('owner_admin_id', $userId));
+            });
         }
         return $query;
     }
 
     private function ensureCourtAccess(Request $request, Lapangan $lapangan): void
     {
-        abort_unless($this->isSuperadmin($request) || (int) $lapangan->owner_admin_id === (int) $request->session()->get('admin_user_id'), 403);
+        $lapangan->loadMissing('venue');
+        $isOwner = (int) $lapangan->owner_admin_id === (int) $request->session()->get('admin_user_id')
+            || (int) ($lapangan->venue?->owner_admin_id ?? 0) === (int) $request->session()->get('admin_user_id');
+        abort_unless($this->isSuperadmin($request) || $isOwner, 403);
     }
 
     private function ensureBookingAccess(Request $request, Booking $booking): void
     {
-        $booking->loadMissing('lapangan');
-        abort_unless($this->isSuperadmin($request) || (int) $booking->lapangan?->owner_admin_id === (int) $request->session()->get('admin_user_id'), 403);
+        $booking->loadMissing('lapangan.venue');
+        $isOwner = (int) ($booking->lapangan?->owner_admin_id ?? 0) === (int) $request->session()->get('admin_user_id')
+            || (int) ($booking->lapangan?->venue?->owner_admin_id ?? 0) === (int) $request->session()->get('admin_user_id');
+        abort_unless($this->isSuperadmin($request) || $isOwner, 403);
     }
 
     private function layoutData(Request $request, array $extra = []): array
@@ -705,6 +714,16 @@ class AdminController extends Controller
         $this->ensureCourtAccess($request, $review->lapangan);
         $data = $request->validate(['reply_message' => ['required', 'string']]);
         $review->update($data);
+
+        // Notifikasi ke user yang memberikan ulasan
+        if ($review->user) {
+            $review->user->notify(new ArenaUserNotification(
+                'Ulasan Anda Dibalas Pengelola',
+                'Pengelola venue membalas ulasan Anda untuk lapangan ' . ($review->lapangan?->nama ?? 'Lapangan') . ': "' . \Illuminate\Support\Str::limit($data['reply_message'], 60) . '"',
+                route('user.courts.show', $review->lapangan_id, false)
+            ));
+        }
+
         return back()->with('success', 'Balasan review berhasil disimpan.');
     }
 

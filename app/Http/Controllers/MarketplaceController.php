@@ -98,7 +98,20 @@ class MarketplaceController extends Controller
      */
     public function venues(Request $request)
     {
-        $user = User::whereKey($request->session()->get('admin_user_id'))->where('role', 'user')->where('status', 'Aktif')->first();
+        $user = User::whereKey($request->session()->get('admin_user_id'))->whereIn('role', ['user', 'venue_admin'])->where('status', 'Aktif')->first();
+
+        // Handle penyimpanan / reset koordinat lokasi GPS di session pengguna (tanpa terpampang di URL)
+        if ($request->has('clear_location')) {
+            $request->session()->forget(['user_lat', 'user_lng']);
+            return redirect()->route('user.venues', $request->except(['clear_location', 'lat', 'lng']));
+        }
+
+        if ($request->filled('lat') && $request->filled('lng') && is_numeric($request->lat) && is_numeric($request->lng)) {
+            $request->session()->put('user_lat', (float) $request->lat);
+            $request->session()->put('user_lng', (float) $request->lng);
+            // Redirect bersih tanpa memaparkan koordinat di parameter URL browser
+            return redirect()->route('user.venues', $request->except(['lat', 'lng']));
+        }
 
         $query = Venue::withCount([
             'lapangans' => function ($query) {
@@ -120,15 +133,16 @@ class MarketplaceController extends Controller
 
         $venues = $query->latest()->get();
 
-        // Cek koordinat GPS user
+        // Cek koordinat GPS user dari session
+        $sessLat = $request->session()->get('user_lat');
+        $sessLng = $request->session()->get('user_lng');
+
         if (
-            $request->filled('lat') &&
-            $request->filled('lng') &&
-            is_numeric($request->lat) &&
-            is_numeric($request->lng)
+            is_numeric($sessLat) &&
+            is_numeric($sessLng)
         ) {
-            $lat = (float) $request->lat;
-            $lng = (float) $request->lng;
+            $lat = (float) $sessLat;
+            $lng = (float) $sessLng;
 
             if ($lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) {
                 $venues = $venues->map(function ($venue) use ($lat, $lng) {
@@ -172,7 +186,7 @@ class MarketplaceController extends Controller
      */
     public function venueDetail(Request $request, Venue $venue)
     {
-        $user = User::whereKey($request->session()->get('admin_user_id'))->where('role', 'user')->where('status', 'Aktif')->first();
+        $user = User::whereKey($request->session()->get('admin_user_id'))->whereIn('role', ['user', 'venue_admin'])->where('status', 'Aktif')->first();
 
         abort_unless($venue->status === 'Aktif', 404);
 
@@ -229,6 +243,8 @@ class MarketplaceController extends Controller
             'company_address' => 'nullable|string|max:1000',
             'company_phone' => 'nullable|string|max:30',
             'company_description' => 'nullable|string|max:3000',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'facilities' => 'nullable|array|max:30',
             'facilities.*' => 'string|max:80',
             'photo' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',

@@ -554,6 +554,38 @@
                 @enderror
             </div>
 
+            <div class="venue-form-group">
+                <label for="latitude">Koordinat Latitude (GPS)</label>
+                <input
+                    type="number"
+                    step="any"
+                    id="latitude"
+                    name="latitude"
+                    value="{{ old('latitude', $venue->latitude) }}"
+                    placeholder="Contoh: -6.331234"
+                >
+                <span class="venue-form-help">Digunakan untuk pencarian venue terdekat dari pengunjung.</span>
+                @error('latitude')
+                    <span class="venue-field-error">{{ $message }}</span>
+                @enderror
+            </div>
+
+            <div class="venue-form-group">
+                <label for="longitude">Koordinat Longitude (GPS)</label>
+                <input
+                    type="number"
+                    step="any"
+                    id="longitude"
+                    name="longitude"
+                    value="{{ old('longitude', $venue->longitude) }}"
+                    placeholder="Contoh: 108.324567"
+                >
+                <span class="venue-form-help">Digunakan untuk pencarian venue terdekat dari pengunjung.</span>
+                @error('longitude')
+                    <span class="venue-field-error">{{ $message }}</span>
+                @enderror
+            </div>
+
             <div class="venue-form-group full-width">
                 <label for="description">Deskripsi Venue</label>
 

@@ -31,7 +31,7 @@ class CekLogin
         $request->session()->put('admin_role',$user->role);
         if ($previousRole && $previousRole !== $user->role) {
             $request->session()->regenerate();
-            if ($request->routeIs('user.*') && $user->role !== 'user' && !$request->routeIs('user.venue-application*')) return redirect()->route('admin.dashboard');
+            if ($request->routeIs('user.*') && $user->role !== 'user' && $user->role !== 'venue_admin' && !$request->routeIs('user.venue-application*')) return redirect()->route('admin.dashboard');
             if ($request->routeIs('admin.*') && $user->role === 'user') return redirect()->route('user.home');
         }
         return $next($request);

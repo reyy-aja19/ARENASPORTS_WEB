@@ -228,8 +228,16 @@
 
                 @php
                     $currentUid = (int) (session('admin_user_id') ?? 0);
+                    $currentUserRole = session('admin_role');
                     $hostUid = (int) ($match->booking?->user_id ?? 0);
-                    $isMatchMember = $currentUid > 0 && ($hostUid === $currentUid || \Illuminate\Support\Facades\DB::table('open_match_participants')->where('open_match_id', $match->id)->where('user_id', $currentUid)->exists());
+                    $isParticipant = $currentUid > 0 && \Illuminate\Support\Facades\DB::table('open_match_participants')->where('open_match_id', $match->id)->where('user_id', $currentUid)->exists();
+                    $isCourtOwner = $currentUid > 0 && (
+                        (int) ($match->booking?->lapangan?->owner_admin_id ?? 0) === $currentUid ||
+                        (int) ($match->booking?->lapangan?->venue?->owner_admin_id ?? 0) === $currentUid ||
+                        ($currentUserRole === 'venue_admin' && empty($match->booking_id))
+                    );
+                    $isMatchMember = $currentUid > 0 && ($hostUid === $currentUid || $isParticipant);
+                    $canAccessChat = $isMatchMember || $isCourtOwner || $currentUserRole === 'superadmin';
                     $isFull = $match->status === 'Penuh' || $match->jumlah_bergabung >= $match->jumlah_pemain;
                     $venueName = $match->booking?->lapangan?->venue?->name;
                     $venueAddress = $match->booking?->lapangan?->venue?->address ?: $match->booking?->lapangan?->lokasi;
@@ -254,7 +262,7 @@
                     </form>
                 @endif
 
-                @if ($isMatchMember)
+                @if ($canAccessChat)
                     <a href="{{ route('user.openmatches.chat', $match) }}" class="u-btn" style="display:inline-flex;margin-top:10px;text-decoration:none;background:#14532d">
                         <i class="fa-solid fa-comments"></i> Obrolan Pemain
                     </a>

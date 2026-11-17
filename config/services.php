@@ -7,6 +7,10 @@ return [
         'token' => env('FONNTE_TOKEN'),
         'endpoint' => env('FONNTE_ENDPOINT', 'https://api.fonnte.com/send'),
     ],
+    'firebase' => [
+        'api_key' => env('FIREBASE_API_KEY', 'AIzaSyCDUVRSyECkOnxuu-gALGUqR5sRqonDWnw'),
+        'project_id' => env('FIREBASE_PROJECT_ID', 'penyewaan-lapangan-64a01'),
+    ],
 
     /*
     |--------------------------------------------------------------------------

@@ -86,6 +86,12 @@
 
         <div class="u-user">
 
+            @if($user->role === 'venue_admin')
+                <a href="{{ route('admin.dashboard') }}" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:10px; background:#0e5a36; color:#fff; font-size:12px; font-weight:700; text-decoration:none; margin-right:6px;">
+                    <i class="fa-solid fa-chart-line"></i> Panel Admin Venue
+                </a>
+            @endif
+
             <a class="u-points" href="{{ route('user.rewards') }}">
                 <i class="fa-solid fa-coins"></i>
                 {{ number_format($user->points ?? 0) }} poin

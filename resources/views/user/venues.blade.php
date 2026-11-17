@@ -531,42 +531,46 @@
     </div>
 
     {{-- LOKASI TERDEKAT GPS & SEARCH BAR --}}
+    @php
+        $isGpsActive = session()->has('user_lat') && session()->has('user_lng');
+    @endphp
     <div class="u-location-bar" style="margin-bottom:20px;">
         <span style="display:flex; align-items:center; gap:8px;">
             <i class="fa-solid fa-location-crosshairs" style="color:#168653; font-size:16px;"></i>
-            @if(request()->filled('lat') && request()->filled('lng'))
-                <strong>Lokasi GPS aktif!</strong> Menampilkan venue terdekat dari lokasimu saat ini.
+            @if($isGpsActive)
+                <strong>Lokasi GPS aktif!</strong> Menampilkan venue terurut dari yang terdekat dengan lokasimu.
             @else
                 Aktifkan GPS untuk menemukan venue olahraga yang paling dekat dengan posisimu.
             @endif
         </span>
 
         <div style="display:flex; gap:8px; align-items:center;">
-            @if(request()->filled('lat') && request()->filled('lng'))
-                <a href="{{ route('user.venues', request()->except(['lat', 'lng'])) }}" class="u-btn ghost" style="padding:8px 12px; font-size:11px; text-decoration:none;">
+            @if($isGpsActive)
+                <a href="{{ route('user.venues', array_merge(request()->except(['clear_location']), ['clear_location' => 1])) }}" class="u-btn ghost" style="padding:8px 12px; font-size:11px; text-decoration:none;">
                     <i class="fa-solid fa-rotate-left"></i> Reset Jarak
                 </a>
             @endif
             <button class="u-btn ghost" type="button" id="venueNearbyButton" style="white-space:nowrap;">
                 <i class="fa-solid fa-location-dot"></i>
-                {{ request()->filled('lat') ? 'Perbarui Lokasi GPS' : 'Cari Venue Terdekat' }}
+                {{ $isGpsActive ? 'Perbarui Lokasi GPS' : 'Cari Venue Terdekat' }}
             </button>
         </div>
     </div>
 
     {{-- FORM PENCARIAN VENUE --}}
     <form class="u-search" method="GET" style="margin-bottom:26px;">
-        @if(request()->filled('lat') && request()->filled('lng'))
-            <input type="hidden" name="lat" value="{{ request('lat') }}">
-            <input type="hidden" name="lng" value="{{ request('lng') }}">
-        @endif
-
         <input
             type="text"
             name="q"
             value="{{ request('q') }}"
             placeholder="Cari nama venue, pengelola, kota, atau alamat..."
         >
+
+        @if(request()->filled('q'))
+            <a href="{{ route('user.venues') }}" class="u-btn ghost" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
+                <i class="fa-solid fa-xmark"></i> Hapus Filter
+            </a>
+        @endif
 
         <button class="u-btn" type="submit">
             <i class="fa-solid fa-magnifying-glass"></i>
@@ -692,14 +696,22 @@
 
 </div>
 
-{{-- SCRIPT GPS LOKASI VENUE TERDEKAT --}}
+{{-- SCRIPT GPS LOKASI VENUE TERDEKAT (AMAN & PRIVASI: MENGGUNAKAN FORM POST / SESSION TANPA MEMAPARKAN DATA DI URL) --}}
+<form id="gpsSessionForm" method="GET" action="{{ route('user.venues') }}" style="display:none;">
+    <input type="hidden" name="lat" id="gpsFormLat">
+    <input type="hidden" name="lng" id="gpsFormLng">
+    @if(request('q'))
+        <input type="hidden" name="q" value="{{ request('q') }}">
+    @endif
+</form>
+
 <script>
 document.getElementById('venueNearbyButton')?.addEventListener('click', function () {
     const button = this;
     const originalText = button.innerHTML;
 
     button.disabled = true;
-    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mencari koordinat GPS…';
+    button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mendeteksi koordinat GPS…';
 
     if (!navigator.geolocation) {
         alert('Browser Anda tidak mendukung layanan geolokasi GPS.');
@@ -710,10 +722,9 @@ document.getElementById('venueNearbyButton')?.addEventListener('click', function
 
     navigator.geolocation.getCurrentPosition(
         function (pos) {
-            const url = new URL(window.location.href);
-            url.searchParams.set('lat', pos.coords.latitude);
-            url.searchParams.set('lng', pos.coords.longitude);
-            window.location.href = url.toString();
+            document.getElementById('gpsFormLat').value = pos.coords.latitude;
+            document.getElementById('gpsFormLng').value = pos.coords.longitude;
+            document.getElementById('gpsSessionForm').submit();
         },
         function (err) {
             let msg = 'Izin lokasi tidak tersedia. Silakan izinkan akses lokasi pada browser Anda.';

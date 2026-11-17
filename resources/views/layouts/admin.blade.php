@@ -29,8 +29,11 @@
 @php
     /*
      * Gunakan data pengguna dari controller jika tersedia.
-     * Jika tidak, gunakan pengguna yang sedang login.
+     * Jika tidak, gunakan pengguna dari session yang sedang login.
      */
+    if (empty($adminUser) && session()->has('admin_user_id')) {
+        $adminUser = \App\Models\User::find(session('admin_user_id'));
+    }
     $adminUser = $adminUser ?? auth()->user();
 
     $adminRole = $adminUser?->role
@@ -201,6 +204,10 @@
             </form>
 
             <div class="topbar-right">
+                <a href="{{ route('user.home') }}" class="btn-ui btn-gray" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:7px 12px; border-radius:10px;" title="Lihat aplikasi dari sisi pemain/pembeli">
+                    <i class="fa-solid fa-store"></i> Mode Pengunjung
+                </a>
+
                 <div class="notification-wrap">
                     <button
                         class="topbar-chip bell-chip anim-click"

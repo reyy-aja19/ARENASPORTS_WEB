@@ -587,6 +587,92 @@
         </div>
     </section>
 
+    {{-- BANNER STATUS PENGAJUAN VENUE JIKA ADA --}}
+    @if(isset($pendingVenueApp) && $pendingVenueApp)
+        <div style="background:linear-gradient(110deg, #fefce8, #fffbeb); border:1px solid #fde047; border-radius:18px; padding:18px 24px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; box-shadow:0 6px 20px rgba(234,179,8,.08);">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <div style="width:44px; height:44px; border-radius:12px; background:#facc15; color:#713f12; display:grid; place-items:center; font-size:20px; flex-shrink:0;">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                </div>
+                <div>
+                    <strong style="color:#713f12; font-size:15px; display:block;">Pengajuan Venue "{{ $pendingVenueApp->venue_name }}" Sedang Ditinjau</strong>
+                    <span style="color:#854d0e; font-size:13px;">Status: <strong>{{ ucfirst($pendingVenueApp->status) }}</strong>. Tim Superadmin sedang memverifikasi data dan dokumen venuemu.</span>
+                </div>
+            </div>
+            <a href="{{ route('user.venue-application') }}" class="u-btn" style="background:#ca8a04; color:#fff; text-decoration:none; padding:10px 18px; font-size:13px; border-radius:10px; font-weight:700;">
+                Lihat Detail Status
+            </a>
+        </div>
+    @endif
+
+    {{-- HIGHLIGHT TIKET JADWAL MAIN TERDEKAT --}}
+    @if(isset($upcomingBooking) && $upcomingBooking)
+        <div style="background:linear-gradient(115deg, #0b5133, #157347); border-radius:20px; padding:22px 28px; margin-bottom:26px; color:#fff; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:18px; box-shadow:0 12px 30px rgba(11,81,51,.25);">
+            <div style="display:flex; align-items:center; gap:18px;">
+                <div style="width:52px; height:52px; border-radius:14px; background:rgba(255,255,255,.18); display:grid; place-items:center; font-size:24px; flex-shrink:0; border:1px solid rgba(255,255,255,.3);">
+                    <i class="fa-solid fa-ticket"></i>
+                </div>
+                <div>
+                    <span style="display:inline-block; font-size:11px; font-weight:800; background:#bbf7d0; color:#14532d; padding:4px 10px; border-radius:20px; margin-bottom:6px; letter-spacing:.5px;">JADWAL SEWA MENDATANG</span>
+                    <h3 style="margin:0 0 4px; font-size:18px; color:#fff;">{{ $upcomingBooking->lapangan?->nama ?? 'Lapangan' }}</h3>
+                    <p style="margin:0; font-size:13px; color:#dcfce7;">
+                        <i class="fa-regular fa-calendar"></i> {{ $upcomingBooking->booking_date?->format('d M Y') }} &nbsp;·&nbsp;
+                        <i class="fa-regular fa-clock"></i> {{ substr($upcomingBooking->start_time, 0, 5) }} - {{ substr($upcomingBooking->end_time, 0, 5) }} WIB &nbsp;·&nbsp;
+                        <i class="fa-solid fa-location-dot"></i> {{ $upcomingBooking->lapangan?->venue?->name ?? ($upcomingBooking->lapangan?->lokasi ?? 'Venue ArenaSports') }}
+                    </p>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <a href="{{ route('user.bookings') }}" class="u-btn" style="background:#fff; color:#0b5133; text-decoration:none; padding:10px 18px; font-size:13px; border-radius:10px; font-weight:800;">
+                    Tiket Saya
+                </a>
+            </div>
+        </div>
+    @endif
+
+    {{-- QUICK ACTIONS GRID --}}
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; margin-bottom:30px;">
+        <a href="{{ route('user.venues') }}" style="background:#fff; border:1px solid #dce8df; border-radius:16px; padding:18px; text-decoration:none; color:inherit; display:flex; align-items:center; gap:14px; transition:transform .2s, box-shadow .2s; box-shadow:0 4px 14px rgba(0,0,0,.03);" onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 10px 24px rgba(22,134,70,.1)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 14px rgba(0,0,0,.03)';">
+            <div style="width:44px; height:44px; border-radius:12px; background:#e8f7ed; color:#168653; display:grid; place-items:center; font-size:18px; flex-shrink:0;">
+                <i class="fa-solid fa-location-crosshairs"></i>
+            </div>
+            <div>
+                <strong style="display:block; font-size:14px; color:#123b28;">Venue Terdekat</strong>
+                <small style="color:#71847a; font-size:11px;">Cari dengan GPS</small>
+            </div>
+        </a>
+
+        <a href="{{ route('user.courts') }}" style="background:#fff; border:1px solid #dce8df; border-radius:16px; padding:18px; text-decoration:none; color:inherit; display:flex; align-items:center; gap:14px; transition:transform .2s, box-shadow .2s; box-shadow:0 4px 14px rgba(0,0,0,.03);" onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 10px 24px rgba(22,134,70,.1)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 14px rgba(0,0,0,.03)';">
+            <div style="width:44px; height:44px; border-radius:12px; background:#e0f2fe; color:#0284c7; display:grid; place-items:center; font-size:18px; flex-shrink:0;">
+                <i class="fa-solid fa-futbol"></i>
+            </div>
+            <div>
+                <strong style="display:block; font-size:14px; color:#123b28;">Sewa Lapangan</strong>
+                <small style="color:#71847a; font-size:11px;">Futsal, Badminton, dll</small>
+            </div>
+        </a>
+
+        <a href="{{ route('user.openmatches') }}" style="background:#fff; border:1px solid #dce8df; border-radius:16px; padding:18px; text-decoration:none; color:inherit; display:flex; align-items:center; gap:14px; transition:transform .2s, box-shadow .2s; box-shadow:0 4px 14px rgba(0,0,0,.03);" onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 10px 24px rgba(22,134,70,.1)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 14px rgba(0,0,0,.03)';">
+            <div style="width:44px; height:44px; border-radius:12px; background:#fef3c7; color:#d97706; display:grid; place-items:center; font-size:18px; flex-shrink:0;">
+                <i class="fa-solid fa-users"></i>
+            </div>
+            <div>
+                <strong style="display:block; font-size:14px; color:#123b28;">Open Match</strong>
+                <small style="color:#71847a; font-size:11px;">Gabung teman main</small>
+            </div>
+        </a>
+
+        <a href="{{ route('user.openmatches') }}" style="background:#fff; border:1px solid #dce8df; border-radius:16px; padding:18px; text-decoration:none; color:inherit; display:flex; align-items:center; gap:14px; transition:transform .2s, box-shadow .2s; box-shadow:0 4px 14px rgba(0,0,0,.03);" onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 10px 24px rgba(22,134,70,.1)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 14px rgba(0,0,0,.03)';">
+            <div style="width:44px; height:44px; border-radius:12px; background:#fae8ff; color:#a855f7; display:grid; place-items:center; font-size:18px; flex-shrink:0;">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <div>
+                <strong style="display:block; font-size:14px; color:#123b28;">Event Resmi</strong>
+                <small style="color:#71847a; font-size:11px;">Turnamen berhadiah</small>
+            </div>
+        </a>
+    </div>
+
     {{-- STATISTIK --}}
     <section class="uh-stats">
 
@@ -747,6 +833,55 @@
         </div>
 
     </section>
+
+    {{-- HIGHLIGHT EVENT RESMI DARI VENUE ADMIN --}}
+    @if(isset($upcomingEvents) && $upcomingEvents->isNotEmpty())
+        <section class="uh-section" style="margin-top:20px;">
+            <div class="uh-section-head">
+                <div>
+                    <h2>
+                        <i class="fa-solid fa-trophy" style="color:#d97706"></i>
+                        Event &amp; Turnamen Resmi
+                    </h2>
+                    <p>Kompetisi olahraga resmi berhadiah dari mitra venue ArenaSports.</p>
+                </div>
+                <a class="uh-link" href="{{ route('user.openmatches') }}">
+                    Lihat semua event
+                    <i class="fa-solid fa-arrow-right"></i>
+                </a>
+            </div>
+
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:18px;">
+                @foreach($upcomingEvents as $ev)
+                    <div style="background:#fff; border:1px solid #e0ece4; border-radius:18px; padding:20px; box-shadow:0 8px 24px rgba(0,0,0,.04); display:flex; flex-direction:column; justify-content:space-between; border-top:4px solid #168653;">
+                        <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
+                                <span style="font-size:11px; font-weight:800; background:#e8f7ec; color:#146c43; padding:4px 8px; border-radius:20px;">
+                                    <i class="fa-solid fa-shield-halved"></i> Resmi
+                                </span>
+                                <span style="font-size:11px; font-weight:700; background:#f3f4f6; color:#4b5563; padding:4px 8px; border-radius:20px;">
+                                    {{ $ev->jenis }}
+                                </span>
+                            </div>
+                            <h3 style="margin:0 0 8px; font-size:16px; color:#143e26;">{{ $ev->title }}</h3>
+                            <p style="margin:0 0 12px; font-size:12px; color:#6b7280; line-height:1.5;">
+                                <i class="fa-regular fa-calendar"></i> {{ $ev->tanggal?->format('d M Y') }} &nbsp;·&nbsp;
+                                <i class="fa-solid fa-location-dot"></i> {{ $ev->lokasi }}
+                            </p>
+                            @if($ev->deskripsi)
+                                <p style="margin:0 0 12px; font-size:12px; color:#374151; line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                                    {{ $ev->deskripsi }}
+                                </p>
+                            @endif
+                        </div>
+                        <a href="{{ route('user.openmatches') }}" style="display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:9px 14px; border-radius:10px; background:#168653; color:#fff; font-size:12px; font-weight:700; text-decoration:none; text-align:center;">
+                            Detail &amp; Pendaftaran
+                        </a>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
 
     {{-- BOOKING DAN OPEN MATCH --}}
     <section class="uh-columns">
