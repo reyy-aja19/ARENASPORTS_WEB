@@ -94,10 +94,14 @@ class Venue extends Model
         }
 
         if ($urls === []) {
-            $urls = array_values(array_filter([$this->photo_url]));
+            foreach (self::FALLBACK_PHOTOS as $candidate) {
+                if (is_file(public_path($candidate))) {
+                    $urls[] = asset($candidate);
+                }
+            }
         }
 
-        return $urls;
+        return array_values(array_unique($urls));
     }
 
     private function resolvePhotoUrl(?string $photo): ?string
