@@ -60,30 +60,92 @@ class Venue extends Model
         return $this->hasMany(VenueWithdrawal::class);
     }
 
+    /**
+     * Foto bawaan untuk venue yang fotonya tidak ada lagi di server
+     * (misalnya karena container deploy dibuat ulang). Semua berkas ini
+     * ikut tersimpan di repository sehingga selalu tersedia.
+     */
+    private const FALLBACK_PHOTOS = [
+        'uploads/courts/20260425184205-6T9Ggss6.jpg',
+        'uploads/courts/20260425184419-6s6ixWyv.jpg',
+        'uploads/courts/20261112135504-RiuORs9p.png',
+    ];
+
     public function getPhotoUrlAttribute(): ?string
     {
-        if (! $this->photo) {
+        $url = $this->resolvePhotoUrl($this->photo);
+
+        return $url ?? $this->fallbackPhotoUrl();
+    }
+
+    /**
+     * Daftar foto galeri venue yang benar-benar bisa dibuka.
+     */
+    public function getGalleryUrlsAttribute(): array
+    {
+        $images = is_array($this->gallery) ? $this->gallery : [];
+
+        $urls = [];
+        foreach ($images as $image) {
+            $url = $this->resolvePhotoUrl(is_string($image) ? $image : null);
+            if ($url !== null) {
+                $urls[] = $url;
+            }
+        }
+
+        if ($urls === []) {
+            $urls = array_values(array_filter([$this->photo_url]));
+        }
+
+        return $urls;
+    }
+
+    private function resolvePhotoUrl(?string $photo): ?string
+    {
+        $photo = trim((string) $photo);
+        if ($photo === '') {
             return null;
         }
 
-        $photo = trim($this->photo);
         if (preg_match('/^https?:\/\//i', $photo)) {
             return $photo;
         }
 
         $path = ltrim($photo, '/');
+
         if (str_starts_with($path, 'storage/')) {
-            return asset($path);
+            $relative = substr($path, strlen('storage/'));
+
+            return Storage::disk('public')->exists($relative)
+                ? asset($path)
+                : null;
         }
 
         if (str_starts_with($path, 'venues/')) {
-            return asset('storage/' . $path);
+            return Storage::disk('public')->exists($path)
+                ? asset('storage/' . $path)
+                : null;
         }
 
         if (Storage::disk('public')->exists($path)) {
             return asset('storage/' . $path);
         }
 
-        return asset($path);
+        if (is_file(public_path($path))) {
+            return asset($path);
+        }
+
+        return null;
+    }
+
+    private function fallbackPhotoUrl(): ?string
+    {
+        foreach (self::FALLBACK_PHOTOS as $candidate) {
+            if (is_file(public_path($candidate))) {
+                return asset($candidate);
+            }
+        }
+
+        return null;
     }
 }

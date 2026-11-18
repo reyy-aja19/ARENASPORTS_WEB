@@ -152,7 +152,7 @@ class BaseApiController extends Controller
             'contact_phone' => $venue->contact_phone,
             'description' => $venue->description,
             'photo_url' => $venue->photo_url,
-            'gallery' => $this->imageList($venue->gallery),
+            'gallery' => $venue->gallery_urls,
             'sports' => $venue->sports ?? [],
             'facilities' => $venue->facilities ?? [],
             'status' => $venue->status,
