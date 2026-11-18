@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{{ $title ?? 'ARENASPORTS' }} · ARENASPORTS</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -158,16 +158,20 @@
                         @endforelse
                     </div>
 
-                    <div id="uNotifMarkAllWrap" style="{{ $user->unreadNotifications()->exists() ? '' : 'display:none;' }}">
-                        <form method="POST"
-                              action="{{ route('user.notifications.read-all') }}">
-
+                    <div class="u-notif-menu-actions" style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid #edf1ed;">
+                        <form id="uNotifReadAllForm" method="POST" action="{{ route('user.notifications.read-all') }}" style="flex:1;">
                             @csrf
-
-                            <button class="u-notif-all" type="submit">
-                                Tandai semua dibaca
+                            <button class="u-notif-all" type="submit" style="width:100%;" {{ $user->unreadNotifications()->exists() ? '' : 'disabled' }}>
+                                <i class="fa-solid fa-check-double"></i> Tandai sudah dibaca
                             </button>
-
+                        </form>
+                        <form method="POST" action="{{ route('user.notifications.clear') }}"
+                              onsubmit="return confirm('Hapus seluruh notifikasi akun ini? Tindakan ini tidak dapat dibatalkan.');">
+                            @csrf
+                            @method('DELETE')
+                            <button class="u-notif-all" type="submit" style="color:#b42318;" {{ $user->notifications()->exists() ? '' : 'disabled' }}>
+                                <i class="fa-regular fa-trash-can"></i> Clear
+                            </button>
                         </form>
                     </div>
 
@@ -251,9 +255,8 @@
 {{-- CHATBOT ARENA ASSISTANT --}}
 <div class="u-chat" id="uChat">
 
-    <button class="u-chat-toggle" id="uChatToggle" type="button">
-        <i class="fa-solid fa-comments"></i>
-        <span>Butuh bantuan?</span>
+    <button class="u-chat-toggle" id="uChatToggle" type="button" aria-label="Buka Arena Assistant" title="Arena Assistant">
+        <i class="fa-solid fa-robot" aria-hidden="true"></i>
     </button>
 
     <section class="u-chat-panel" id="uChatPanel" hidden>

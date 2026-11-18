@@ -137,6 +137,9 @@ Route::prefix('user')->name('user.')->group(function () {
         'availability'
     ])->name('courts.availability');
 
+    Route::get('/open-match/create', [UserController::class, 'createOpenMatch'])
+        ->name('openmatches.create');
+
     Route::get('/open-match', [UserController::class, 'openMatches'])
         ->name('openmatches');
 });
@@ -173,6 +176,11 @@ Route::middleware([CekLogin::class, 'role:user'])
             'read'
         ])->name('notifications.read');
 
+        Route::post('/notifikasi/{notification}/mark-read', [
+            UserNotificationController::class,
+            'markRead'
+        ])->name('notifications.mark-read');
+
         Route::post('/notifikasi/read-all', [
             UserNotificationController::class,
             'readAll'
@@ -186,6 +194,10 @@ Route::middleware([CekLogin::class, 'role:user'])
 
         Route::get('/', [UserController::class, 'home'])
             ->name('home');
+        Route::delete('/notifikasi/clear', [
+            UserNotificationController::class,
+            'clear'
+        ])->name('notifications.clear');
 
         /*
         |--------------------------------------------------------------------------
@@ -350,7 +362,7 @@ Route::middleware([CekLogin::class, 'role:user,venue_admin'])
 |--------------------------------------------------------------------------
 */
 
-Route::middleware([CekLogin::class, 'role:superadmin,admin,venue_admin'])
+Route::middleware([CekLogin::class, 'role:superadmin,venue_admin'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function () {
@@ -363,6 +375,16 @@ Route::middleware([CekLogin::class, 'role:superadmin,admin,venue_admin'])
 
         Route::get('/dashboard', [AdminController::class, 'dashboard'])
             ->name('dashboard');
+
+        // Notifikasi Admin dan Superadmin
+        Route::post('/notifikasi/{notification}/read', [AdminController::class, 'notificationRead'])
+            ->name('notifications.read');
+        Route::post('/notifikasi/read-all', [AdminController::class, 'notificationsReadAll'])
+            ->name('notifications.read-all');
+        Route::delete('/notifikasi/clear', [AdminController::class, 'notificationsClear'])
+            ->name('notifications.clear');
+        Route::get('/api/notifications', [AdminController::class, 'apiNotifications'])
+            ->name('api.notifications');
 
         /*
         |--------------------------------------------------------------------------
