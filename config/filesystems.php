@@ -33,7 +33,6 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
             'throw' => false,
             'report' => false,
         ],
@@ -43,6 +42,10 @@ return [
             'root' => storage_path('app/public'),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
+            // Laravel mendaftarkan rute `/storage/{path}` untuk disk ini,
+            // sehingga foto tetap tersaji meski symlink public/storage belum
+            // dibuat (mis. pada container deploy).
+            'serve' => true,
             'throw' => false,
             'report' => false,
         ],

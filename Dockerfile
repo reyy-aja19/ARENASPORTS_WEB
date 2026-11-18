@@ -60,5 +60,5 @@ RUN mkdir -p /var/www/html/storage/framework/sessions \
     && chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
     && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
 
-CMD ["sh", "-c", "php artisan config:clear && php artisan cache:clear && /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
+CMD ["sh", "-c", "chown -R www-data:www-data /var/www/html/storage/app/public 2>/dev/null || true; php artisan storage:link || true; php artisan migrate --force; php artisan config:clear && php artisan cache:clear && /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
 
