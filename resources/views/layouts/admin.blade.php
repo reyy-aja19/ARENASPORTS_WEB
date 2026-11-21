@@ -7,6 +7,8 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <link rel="stylesheet" href="{{ asset('admin-ui.css') }}">
+    <link rel="icon" type="image/png" href="{{ asset('favicon.ico') }}">
+    <link rel="apple-touch-icon" href="{{ asset('favicon.ico') }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <style>
         @keyframes bellShake {
@@ -52,8 +54,12 @@
 <div class="admin-shell">
     <aside class="sidebar">
         <div class="sidebar-brand">
-            <div class="brand-circle">
-                <i class="fa-regular fa-futbol"></i>
+            <div class="brand-circle" style="overflow: hidden; padding: 0;">
+                <img
+                    src="{{ asset('favicon.ico') }}"
+                    alt="Logo ArenaSports"
+                    style="width: 100%; height: 100%; object-fit: cover; display: block;"
+                >
             </div>
 
             <div class="brand-copy">
