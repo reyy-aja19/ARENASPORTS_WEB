@@ -177,6 +177,32 @@ class BookingController extends BaseApiController
             : 'Booking berhasil dibuat. Lanjutkan pembayaran melalui Midtrans.', 201);
     }
 
+    public function cancel(Request $request, Booking $booking)
+    {
+        $this->authorizeOwner($request, $booking);
+
+        // Mirror the effective status logic from BaseApiController::bookingPayload.
+        $effectiveStatus = $booking->status;
+        if (! in_array($effectiveStatus, ['Dibatalkan', 'Selesai'], true)) {
+            $end = Carbon::parse(
+                $booking->booking_date?->toDateString().' '.substr((string) $booking->end_time, 0, 5)
+            );
+            if ($end->isPast()) {
+                $effectiveStatus = 'Selesai';
+            }
+        }
+
+        if (! in_array($effectiveStatus, ['Menunggu', 'DP'], true)) {
+            return $this->fail('Booking ini tidak bisa dibatalkan pada saat ini.', 422);
+        }
+
+        $booking->update(['status' => 'Dibatalkan']);
+
+        return $this->ok([
+            'booking' => $this->bookingPayload($booking, true),
+        ], 'Booking berhasil dibatalkan.');
+    }
+
     public function ticket(Request $request, Booking $booking)
     {
         $this->authorizeOwner($request, $booking);

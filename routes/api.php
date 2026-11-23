@@ -98,6 +98,7 @@ Route::middleware('api.token')->group(function () {
     Route::get('/bookings', [BookingController::class, 'index']);
     Route::get('/bookings/eligible', [BookingController::class, 'eligible']);
     Route::post('/bookings', [BookingController::class, 'store']);
+    Route::post('/bookings/{booking}/cancel', [BookingController::class, 'cancel']);
     Route::get('/bookings/{booking}', [BookingController::class, 'show']);
     Route::get('/bookings/{booking}/ticket', [BookingController::class, 'ticket']);
     Route::post('/bookings/{booking}/review', [BookingController::class, 'review']);
