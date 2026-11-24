@@ -75,6 +75,13 @@ class AuthController extends BaseApiController
             ]);
         }
 
+        $rateKey = 'api-login:'.strtolower($identifier);
+
+        if (RateLimiter::tooManyAttempts($rateKey, 10)) {
+            return $this->fail('Terlalu banyak percobaan masuk. Coba lagi dalam 10 menit.', 429);
+        }
+        RateLimiter::hit($rateKey, 600);
+
         $user = User::where('email', strtolower($identifier))->first();
 
         if (! $user) {
@@ -152,6 +159,13 @@ class AuthController extends BaseApiController
         $data = $request->validate([
             'email' => ['required', 'email'],
         ]);
+
+        $emailKey = 'api-forgot:'.$data['email'];
+
+        if (RateLimiter::tooManyAttempts($emailKey, 5)) {
+            return $this->fail('Terlalu banyak permintaan reset password. Coba lagi dalam 10 menit.', 429);
+        }
+        RateLimiter::hit($emailKey, 600);
 
         $status = Password::sendResetLink(['email' => $data['email']]);
 

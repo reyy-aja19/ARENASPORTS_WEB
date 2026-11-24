@@ -14,6 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
 
+        // 'api' rate limiter didaftarkan di AppServiceProvider::boot().
+        $middleware->throttleApi();
+
         // Midtrans sends server-to-server notifications without a browser CSRF token.
         // Authenticity is validated using the Midtrans signature in MidtransController.
         $middleware->validateCsrfTokens(except: [
