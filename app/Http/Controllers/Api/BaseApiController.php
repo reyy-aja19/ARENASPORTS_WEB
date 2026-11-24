@@ -322,10 +322,11 @@ class BaseApiController extends Controller
 
     protected function matchPayload(OpenMatch $match, ?User $user = null): array
     {
-        $match->loadMissing('booking.lapangan.venue');
+        $match->loadMissing('booking.lapangan.venue', 'booking.user');
 
         $booking = $match->booking;
         $court = $booking?->lapangan;
+        $venue = $court?->venue;
         $hostId = $booking?->user_id ? (int) $booking->user_id : null;
 
         $joined = false;
@@ -355,22 +356,39 @@ class BaseApiController extends Controller
             'organizer' => $booking?->user?->name,
             'field_id' => $court?->id,
             'field_name' => $court?->nama,
-            'venue_name' => $court?->venue?->name,
+            'venue_name' => $venue?->name,
+            'venue_address' => $match->venue_address,
+            'venue_latitude' => $venue?->latitude,
+            'venue_longitude' => $venue?->longitude,
+            'google_maps_url' => $match->maps_url,
+            'google_maps_embed_url' => $match->maps_embed_url,
+            'contact_phone' => $match->contact_phone,
+            'contact_whatsapp' => $match->whatsapp_number,
+            'level' => $match->level,
+            'biaya_per_pemain' => $match->biaya_per_pemain !== null ? (int) $match->biaya_per_pemain : null,
+            'is_free' => $match->is_free,
+            'booking_total_price' => $booking ? (int) $booking->total_price : null,
+            'suggested_price_per_player' => $match->suggested_price_per_player,
             'image_url' => $court?->foto_url,
-            'registration_fee' => null,
+            'registration_fee' => $match->biaya_per_pemain !== null ? (int) $match->biaya_per_pemain : 0,
             'prize' => null,
             'joined' => $joined,
             'is_host' => $isHost,
             'is_full' => (int) $match->jumlah_bergabung >= (int) $match->jumlah_pemain,
             'chat_available' => $joined,
+            'has_ended' => $match->has_ended,
         ];
     }
 
-    protected function eventPayload(Event $event): array
+    protected function eventPayload(Event $event, ?User $user = null): array
     {
-        $event->loadMissing('creator.venues');
+        $event->loadMissing('creator.venues', 'venue', 'registrations');
 
-        $venue = $event->creator?->venues?->first();
+        $venue = $event->venue ?: $event->creator?->venues?->first();
+        $registrationCount = $event->registrations->count();
+        $userRegistration = $user
+            ? $event->registrations->firstWhere('user_id', $user->id)
+            : null;
 
         return [
             'id' => (int) $event->id,
@@ -381,7 +399,7 @@ class BaseApiController extends Controller
             'start_time' => substr((string) $event->start_time, 0, 5),
             'end_time' => substr((string) $event->end_time, 0, 5),
             'jumlah_pemain' => (int) $event->kuota,
-            'jumlah_bergabung' => 0,
+            'jumlah_bergabung' => $registrationCount,
             'deskripsi' => $event->deskripsi,
             'status' => $event->status,
             'event_type' => 'tournament',
@@ -389,12 +407,30 @@ class BaseApiController extends Controller
             'field_id' => null,
             'field_name' => $event->lokasi,
             'venue_name' => $venue?->name ?: $event->lokasi,
+            'venue_address' => $event->venue_address ?: $event->lokasi,
+            'venue_latitude' => $venue?->latitude,
+            'venue_longitude' => $venue?->longitude,
+            'google_maps_url' => $event->maps_url,
+            'google_maps_embed_url' => $event->maps_embed_url,
+            'contact_phone' => $event->contact_phone,
+            'contact_whatsapp' => $event->whatsapp_number,
             'image_url' => $venue?->photo_url,
-            'registration_fee' => null,
-            'prize' => null,
-            'joined' => false,
+            'registration_fee' => (int) ($event->registration_fee ?? 0),
+            'prize' => $event->prize,
+            'registration_deadline' => $event->registration_deadline?->toDateString(),
+            'is_registered' => $userRegistration !== null,
+            'registration_status' => $userRegistration?->status,
+            'registration' => $userRegistration ? [
+                'id' => (int) $userRegistration->id,
+                'team_name' => $userRegistration->team_name,
+                'captain_name' => $userRegistration->captain_name,
+                'captain_phone' => $userRegistration->captain_phone,
+                'member_count' => (int) $userRegistration->member_count,
+                'status' => $userRegistration->status,
+            ] : null,
+            'joined' => $userRegistration !== null,
             'is_host' => false,
-            'is_full' => false,
+            'is_full' => (int) $event->kuota > 0 && $registrationCount >= (int) $event->kuota,
             'chat_available' => false,
         ];
     }

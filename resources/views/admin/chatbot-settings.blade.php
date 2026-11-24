@@ -7,7 +7,7 @@
 
     <p class="chatbot-description">
         Atur provider, model, dan instruksi asisten AI ArenaSports.
-        API key harus disimpan pada file .env, bukan di database.
+        Untuk Gemini, simpan <code>GEMINI_API_KEY</code> di file <code>.env</code> (jangan di database).
     </p>
 
     <form
@@ -22,6 +22,10 @@
             <div class="chatbot-field">
                 <label for="provider">Provider AI</label>
                 <select id="provider" name="provider" required>
+                    <option value="gemini"
+                        @selected(old('provider', $settings->provider) === 'gemini')>
+                        Gemini AI
+                    </option>
                     <option value="openai"
                         @selected(old('provider', $settings->provider) === 'openai')>
                         OpenAI
@@ -41,7 +45,7 @@
                     name="model"
                     value="{{ old('model', $settings->model) }}"
                     maxlength="100"
-                    placeholder="Contoh: gpt-4o-mini"
+                    placeholder="Contoh: gemini-flash-lite-latest"
                     required
                 >
             </div>
@@ -64,7 +68,7 @@
             <div class="chatbot-toggle-row chatbot-field-full">
                 <div>
                     <strong>Aktifkan chatbot AI</strong>
-                    <p>Aktifkan setelah integrasi API backend selesai.</p>
+                    <p>Jika nonaktif, chatbot akan menampilkan pesan bahwa asisten sedang tidak aktif.</p>
                 </div>
 
                 <label class="chatbot-switch" for="is_enabled">

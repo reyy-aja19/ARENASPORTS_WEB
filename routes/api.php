@@ -117,6 +117,9 @@ Route::middleware('api.token')->group(function () {
     Route::get('/open-matches/{openMatch}/messages', [OpenMatchController::class, 'messages']);
     Route::post('/open-matches/{openMatch}/messages', [OpenMatchController::class, 'sendMessage']);
 
+    // Event / turnamen resmi
+    Route::post('/events/{event}/register', [OpenMatchController::class, 'registerEvent']);
+
     // Rewards
     Route::get('/rewards', [RewardController::class, 'index']);
     Route::post('/rewards/{reward}/redeem', [RewardController::class, 'redeem']);

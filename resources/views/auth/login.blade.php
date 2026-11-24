@@ -218,6 +218,12 @@
                 Masuk dengan Google
             </a>
 
+            {{-- Login Apple --}}
+            <a class="u-google-login" href="{{ route('auth.apple.redirect') }}">
+                <i class="fa-brands fa-apple"></i>
+                Lanjutkan dengan Apple
+            </a>
+
             <p class="u-register-prompt">
                 Belum punya akun?
                 <a href="{{ route('register') }}">Daftar gratis</a>
@@ -256,6 +262,8 @@
 
     });
 </script>
+
+@include('layouts.partials.site-footer')
 
 </body>
 </html>

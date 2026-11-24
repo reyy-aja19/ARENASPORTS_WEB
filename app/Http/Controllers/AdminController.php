@@ -145,6 +145,7 @@ class AdminController extends Controller
 
         $dbNotifs = $adminUser ? $adminUser->unreadNotifications()->latest()->take(10)->get()->map(function ($n) {
             return [
+                'id' => $n->id,
                 'type' => 'system',
                 'icon' => 'fa-solid fa-bell',
                 'label' => $n->data['title'] ?? 'Notifikasi Sistem',
@@ -152,6 +153,7 @@ class AdminController extends Controller
                 'time' => optional($n->created_at)->diffForHumans(),
                 'sort_at' => optional($n->created_at)?->timestamp ?? 0,
                 'url' => $n->data['url'] ?? route('admin.dashboard'),
+                'read_at' => $n->read_at,
             ];
         }) : collect();
 
@@ -215,60 +217,181 @@ class AdminController extends Controller
         ]);
     }
 
+    public function notifications(Request $request): View
+    {
+        $adminUser = $this->adminUser($request);
+        abort_unless($adminUser, 403);
+
+        $items = $adminUser->notifications()->latest()->paginate(15);
+
+        return view('admin.notifications', $this->layoutData($request, compact('items')));
+    }
+
+    public function notificationRead(Request $request, string $notification): RedirectResponse
+    {
+        $adminUser = $this->adminUser($request);
+        abort_unless($adminUser, 403);
+
+        $item = $adminUser->notifications()->where('id', $notification)->firstOrFail();
+        $item->markAsRead();
+
+        $url = $item->data['url'] ?? route('admin.dashboard');
+        if (! is_string($url) || (! str_starts_with($url, '/') && ! str_starts_with($url, url('/')))) {
+            $url = route('admin.dashboard');
+        }
+
+        return redirect($url);
+    }
+
+    public function notificationMarkRead(Request $request, string $notification): RedirectResponse
+    {
+        $adminUser = $this->adminUser($request);
+        abort_unless($adminUser, 403);
+
+        $item = $adminUser->notifications()->where('id', $notification)->firstOrFail();
+        if ($item->read_at === null) {
+            $item->markAsRead();
+        }
+
+        return back()->with('success', 'Notifikasi berhasil ditandai sudah dibaca.');
+    }
+
+    public function notificationsReadAll(Request $request): RedirectResponse
+    {
+        $adminUser = $this->adminUser($request);
+        abort_unless($adminUser, 403);
+
+        $adminUser->unreadNotifications()->update(['read_at' => now()]);
+
+        return back()->with('success', 'Semua notifikasi sudah ditandai dibaca.');
+    }
+
+    public function notificationDelete(Request $request, string $notification): RedirectResponse
+    {
+        $adminUser = $this->adminUser($request);
+        abort_unless($adminUser, 403);
+
+        $adminUser->notifications()->where('id', $notification)->delete();
+
+        return back()->with('success', 'Notifikasi berhasil dihapus.');
+    }
+
+    public function notificationsClear(Request $request): RedirectResponse
+    {
+        $adminUser = $this->adminUser($request);
+        abort_unless($adminUser, 403);
+
+        $deleted = $adminUser->notifications()->delete();
+
+        return redirect()
+            ->route('admin.notifications')
+            ->with('success', $deleted > 0 ? 'Semua notifikasi berhasil dibersihkan.' : 'Tidak ada notifikasi untuk dibersihkan.');
+    }
+
     public function dashboard(Request $request): View
     {
-        // Group in PHP so dashboard analytics work on SQLite and MySQL alike.
-        $ownedBookingIds = Booking::whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id'))->pluck('id');
-        $paymentQuery = Payment::whereIn('booking_id', $ownedBookingIds);
-        $revenuePerMonth = (clone $paymentQuery)->where('status', 'Lunas')->whereNotNull('paid_at')->get()->groupBy(fn ($item) => $item->paid_at?->format('m'))->map(fn ($items) => $items->sum('amount'));
-        $bookingPerMonth = Booking::whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id'))->get()->groupBy(fn ($item) => $item->booking_date ? date('m', strtotime($item->booking_date)) : null)->map(fn ($items) => $items->count());
-        $dashboardUsers = User::where('role', 'user');
-        if (! $this->isSuperadmin($request)) {
-            $dashboardUsers->whereHas('bookings', fn ($q) => $q->whereIn('lapangan_id', $this->ownedCourtsQuery($request)->select('id')));
-        }
-        $userPerMonth = (clone $dashboardUsers)->get()->groupBy(fn ($item) => $item->created_at?->format('m'))->map(fn ($items) => $items->count());
-        $months = collect(range(4, 0))->map(fn ($offset) => now()->subMonths($offset)->format('m'))->all();
+        $isSuper = $this->isSuperadmin($request);
+        $commissionPercent = max(0, min(100, (float) config('arenasports.venue_commission_percent', 10)));
+        $paidStatuses = ['Lunas', 'settlement', 'capture', 'success', 'paid'];
 
-        $stats = [
-            ['label' => 'Total Users', 'value' => (clone $dashboardUsers)->count()],
-            ['label' => 'Total Lapangan', 'value' => $this->ownedCourtsQuery($request)->count()],
-            ['label' => 'Total Pendapatan', 'value' => 'Rp ' . number_format((int) (clone $paymentQuery)->where('status', 'Lunas')->sum('amount'), 0, ',', '.')],
-        ];
-        if ($request->session()->get('admin_role') === 'venue_admin') {
-            $grossVenue = (int) (clone $paymentQuery)->whereIn('status', ['Lunas','settlement','capture','success','paid'])->sum('amount');
-            $commissionPercent = max(0, min(100, (float) config('arenasports.venue_commission_percent', 10)));
-            $stats[2] = ['label' => 'Pendapatan Venue (setelah komisi ' . $commissionPercent . '%)', 'value' => 'Rp ' . number_format((int) floor($grossVenue * (100 - $commissionPercent) / 100), 0, ',', '.')];
-        }
-        if ($this->isSuperadmin($request)) {
-            $gross = (int) Payment::whereIn('status', ['Lunas','settlement','capture','success','paid'])
-                ->whereHas('booking.lapangan', fn ($q) => $q->whereNotNull('venue_id'))
-                ->sum('amount');
-            $commissionPercent = max(0, min(100, (float) config('arenasports.venue_commission_percent', 10)));
-            $commission = (int) floor($gross * $commissionPercent / 100);
-            $venueEarnings = $gross - $commission;
-            $pendingWithdrawals = (int) VenueWithdrawal::whereIn('status', ['Menunggu','Diproses'])->sum('amount');
-            $paidWithdrawals = (int) VenueWithdrawal::where('status', 'Dibayar')->sum('amount');
+        $courtIds = $this->ownedCourtsQuery($request)->select('id');
+        $ownerId = (int) $request->session()->get('admin_user_id');
+
+        $months = collect(range(5, 0))->map(fn ($offset) => now()->subMonths($offset)->format('Y-m'))->values()->all();
+        $chartLabels = array_map(fn ($ym) => \Carbon\Carbon::createFromFormat('Y-m', $ym)->translatedFormat('M Y'), $months);
+
+        if ($isSuper) {
+            $allBookings = Booking::query();
+            $allPaidPayments = Payment::whereIn('status', $paidStatuses)
+                ->whereHas('booking.lapangan', fn ($q) => $q->whereNotNull('venue_id'));
+            $pendingVenueApps = class_exists(\App\Models\VenueApplication::class)
+                ? \App\Models\VenueApplication::whereIn('status', ['pending', 'revision'])->count()
+                : 0;
+            $pendingPayments = Payment::where(function ($q) use ($paidStatuses) {
+                $q->where('status', 'Menunggu')
+                    ->orWhereNotIn('status', array_merge($paidStatuses, ['Gagal', 'Expired', 'Dibatalkan', 'Ditolak']));
+            })->count();
+
+            $gross = (int) (clone $allPaidPayments)->sum('amount');
+            $platformCommission = (int) floor($gross * $commissionPercent / 100);
+
             $stats = [
-                ['label' => 'Total Booking Berhasil (GMV)', 'value' => 'Rp ' . number_format($gross, 0, ',', '.')],
-                ['label' => 'Pendapatan Platform (Komisi ' . $commissionPercent . '%)', 'value' => 'Rp ' . number_format($commission, 0, ',', '.')],
-                ['label' => 'Hak Pendapatan Admin Venue', 'value' => 'Rp ' . number_format($venueEarnings, 0, ',', '.')],
-                ['label' => 'Penarikan Menunggu / Diproses', 'value' => 'Rp ' . number_format($pendingWithdrawals, 0, ',', '.')],
-                ['label' => 'Penarikan Sudah Dibayar', 'value' => 'Rp ' . number_format($paidWithdrawals, 0, ',', '.')],
                 ['label' => 'Total User', 'value' => User::where('role', 'user')->count()],
                 ['label' => 'Total Venue', 'value' => Venue::count()],
+                ['label' => 'Total Lapangan', 'value' => Lapangan::count()],
+                ['label' => 'Venue Menunggu Verifikasi', 'value' => $pendingVenueApps],
+                ['label' => 'Total Booking', 'value' => (clone $allBookings)->count()],
+                ['label' => 'Pendapatan Platform (Komisi '.$commissionPercent.'%)', 'value' => 'Rp ' . number_format($platformCommission, 0, ',', '.')],
+                ['label' => 'Menunggu Konfirmasi Pembayaran', 'value' => $pendingPayments],
+            ];
+
+            $bookingPerMonth = Booking::all()
+                ->groupBy(fn ($b) => $b->booking_date ? \Carbon\Carbon::parse($b->booking_date)->format('Y-m') : null)
+                ->map(fn ($items) => $items->count());
+            $revenuePerMonth = Payment::whereIn('status', $paidStatuses)
+                ->whereNotNull('paid_at')
+                ->get()
+                ->groupBy(fn ($p) => $p->paid_at?->format('Y-m'))
+                ->map(fn ($items) => (int) floor($items->sum('amount') * $commissionPercent / 100));
+            $grossPerMonth = Payment::whereIn('status', $paidStatuses)
+                ->whereNotNull('paid_at')
+                ->get()
+                ->groupBy(fn ($p) => $p->paid_at?->format('Y-m'))
+                ->map(fn ($items) => (int) $items->sum('amount'));
+
+            $bookingStatus = [
+                'Menunggu' => Booking::where('status', 'Menunggu')->count(),
+                'Lunas/DP' => Booking::whereIn('status', ['Lunas', 'DP'])->count(),
+                'Selesai' => Booking::where('status', 'Selesai')->count(),
+                'Dibatalkan' => Booking::where('status', 'Dibatalkan')->count(),
+            ];
+        } else {
+            $venueCount = Venue::where('owner_admin_id', $ownerId)->count();
+            $ownedBookings = Booking::whereIn('lapangan_id', $courtIds);
+            $ownedPayments = Payment::whereIn('booking_id', (clone $ownedBookings)->select('id'));
+            $pendingPayments = (clone $ownedPayments)
+                ->where(function ($q) use ($paidStatuses) {
+                    $q->where('status', 'Menunggu')
+                        ->orWhereNotIn('status', array_merge($paidStatuses, ['Gagal', 'Expired', 'Dibatalkan', 'Ditolak']));
+                })->count();
+            $grossVenue = (int) (clone $ownedPayments)->whereIn('status', $paidStatuses)->sum('amount');
+            $netVenue = (int) floor($grossVenue * (100 - $commissionPercent) / 100);
+
+            $stats = [
+                ['label' => 'Total Venue Sendiri', 'value' => $venueCount],
+                ['label' => 'Total Lapangan Sendiri', 'value' => (clone $this->ownedCourtsQuery($request))->count()],
+                ['label' => 'Total Booking Venue Sendiri', 'value' => (clone $ownedBookings)->count()],
+                ['label' => 'Menunggu Konfirmasi Pembayaran', 'value' => $pendingPayments],
+                ['label' => 'Pendapatan Kotor', 'value' => 'Rp ' . number_format($grossVenue, 0, ',', '.')],
+                ['label' => 'Pendapatan Bersih (setelah komisi '.$commissionPercent.'%)', 'value' => 'Rp ' . number_format($netVenue, 0, ',', '.')],
+            ];
+
+            $bookingPerMonth = (clone $ownedBookings)->get()
+                ->groupBy(fn ($b) => $b->booking_date ? \Carbon\Carbon::parse($b->booking_date)->format('Y-m') : null)
+                ->map(fn ($items) => $items->count());
+            $grossPerMonth = (clone $ownedPayments)->whereIn('status', $paidStatuses)->whereNotNull('paid_at')->get()
+                ->groupBy(fn ($p) => $p->paid_at?->format('Y-m'))
+                ->map(fn ($items) => (int) $items->sum('amount'));
+            $revenuePerMonth = $grossPerMonth->map(fn ($v) => (int) floor($v * (100 - $commissionPercent) / 100));
+
+            $bookingStatus = [
+                'Menunggu' => (clone $ownedBookings)->where('status', 'Menunggu')->count(),
+                'Lunas/DP' => (clone $ownedBookings)->whereIn('status', ['Lunas', 'DP'])->count(),
+                'Selesai' => (clone $ownedBookings)->where('status', 'Selesai')->count(),
+                'Dibatalkan' => (clone $ownedBookings)->where('status', 'Dibatalkan')->count(),
             ];
         }
+
         return view('admin.dashboard', $this->layoutData($request, [
             'stats' => $stats,
-
-            'chartLabels' => array_map(fn($m) => now()->setMonth((int) $m)->translatedFormat('M'), $months),
-            'chartUsers' => array_map(fn($m) => (int) ($userPerMonth[$m] ?? 0), $months),
-            'chartLapangan' => array_map(fn($m) => (int) ($bookingPerMonth[$m] ?? 0), $months),
-            'chartRevenue' => array_map(fn($m) => (int) ($revenuePerMonth[$m] ?? 0), $months),
-            'userRatio' => [
-                (clone $dashboardUsers)->where('status', 'Aktif')->count(),
-                (clone $dashboardUsers)->where('status', '!=', 'Aktif')->count(),
-            ],
+            'isSuper' => $isSuper,
+            'isVenueAdmin' => ! $isSuper,
+            'chartLabels' => $chartLabels,
+            'chartBookings' => array_map(fn ($m) => (int) ($bookingPerMonth[$m] ?? 0), $months),
+            'chartRevenue' => array_map(fn ($m) => (int) ($revenuePerMonth[$m] ?? 0), $months),
+            'chartGross' => array_map(fn ($m) => (int) ($grossPerMonth[$m] ?? 0), $months),
+            'bookingStatusLabels' => array_keys($bookingStatus),
+            'bookingStatusValues' => array_values($bookingStatus),
         ]));
     }
 
@@ -363,6 +486,28 @@ class AdminController extends Controller
         }
         $user->delete();
         return back()->with('success', 'User berhasil dihapus.');
+    }
+
+    public function venuesManage(Request $request): View
+    {
+        abort_unless($this->isSuperadmin($request), 403);
+
+        $venues = Venue::with(['owner', 'lapangans'])
+            ->withCount('lapangans')
+            ->latest()
+            ->get();
+
+        return view('admin.venues-manage', $this->layoutData($request, compact('venues')));
+    }
+
+    public function venueManageShow(Request $request, Venue $venue): View
+    {
+        abort_unless($this->isSuperadmin($request), 403);
+
+        $venue->load(['owner', 'lapangans' => fn ($q) => $q->latest()]);
+        $courts = $venue->lapangans;
+
+        return view('admin.venue-manage-show', $this->layoutData($request, compact('venue', 'courts')));
     }
 
     public function courts(Request $request): View
@@ -596,7 +741,7 @@ class AdminController extends Controller
     public function openMatches(Request $request): View
     {
         $courtIds = $this->ownedCourtsQuery($request)->select('id');
-        $query = OpenMatch::with(['booking.user', 'booking.lapangan']);
+        $query = OpenMatch::with(['booking.user', 'booking.lapangan.venue']);
         if (!$this->isSuperadmin($request)) {
             $query->whereHas('booking.lapangan', fn ($q) => $q->whereIn('id', $courtIds));
         }
@@ -621,6 +766,9 @@ class AdminController extends Controller
             'end_time' => ['nullable'],
             'jumlah_pemain' => ['required', 'integer', 'min:1', 'max:99'],
             'jumlah_bergabung' => ['nullable', 'integer', 'min:0', 'max:99'],
+            'biaya_per_pemain' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'level' => ['nullable', 'string', 'max:50'],
+            'contact_phone' => ['nullable', 'string', 'max:30'],
             'deskripsi' => ['nullable', 'string'],
             'status' => ['required', 'in:Open,Penuh,Selesai,Dibatalkan'],
         ]);
@@ -655,6 +803,9 @@ class AdminController extends Controller
             'end_time' => ['nullable'],
             'jumlah_pemain' => ['required', 'integer', 'min:1', 'max:99'],
             'jumlah_bergabung' => ['nullable', 'integer', 'min:0', 'max:99'],
+            'biaya_per_pemain' => ['nullable', 'integer', 'min:0', 'max:10000000'],
+            'level' => ['nullable', 'string', 'max:50'],
+            'contact_phone' => ['nullable', 'string', 'max:30'],
             'deskripsi' => ['nullable', 'string'],
             'status' => ['required', 'in:Open,Penuh,Selesai,Dibatalkan'],
         ]);

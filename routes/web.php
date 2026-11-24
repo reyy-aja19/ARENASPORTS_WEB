@@ -53,6 +53,12 @@ Route::get('/auth/google/redirect', [AuthController::class, 'redirectToGoogle'])
 Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])
     ->name('auth.google.callback');
 
+Route::get('/auth/apple/redirect', [AuthController::class, 'redirectToApple'])
+    ->name('auth.apple.redirect');
+
+Route::match(['get', 'post'], '/auth/apple/callback', [AuthController::class, 'handleAppleCallback'])
+    ->name('auth.apple.callback');
+
 Route::get('/register', [AuthController::class, 'showRegister'])
     ->name('register');
 
@@ -198,6 +204,10 @@ Route::middleware([CekLogin::class, 'role:user'])
             UserNotificationController::class,
             'clear'
         ])->name('notifications.clear');
+        Route::delete('/notifikasi/{notification}', [
+            UserNotificationController::class,
+            'delete'
+        ])->name('notifications.delete');
 
         /*
         |--------------------------------------------------------------------------
@@ -212,6 +222,11 @@ Route::middleware([CekLogin::class, 'role:user'])
 
         Route::get('/booking', [UserController::class, 'bookings'])
             ->name('bookings');
+
+        Route::post('/booking/{booking}/batalkan', [
+            UserController::class,
+            'bookingCancel'
+        ])->name('bookings.cancel');
 
         Route::get('/booking/{booking}/tiket', [
             UserController::class,
@@ -261,8 +276,24 @@ Route::middleware([CekLogin::class, 'role:user'])
         |--------------------------------------------------------------------------
         */
 
-        Route::get('/pembayaran', [UserController::class, 'payments'])
-            ->name('payments');
+        Route::get('/pembayaran', function () {
+            return redirect()->route('user.bookings');
+        })->name('payments');
+
+        Route::get('/pembayaran/{payment}/status', [
+            MidtransController::class,
+            'paymentStatus'
+        ])->name('payments.status');
+
+        Route::get('/pembayaran/{payment}/bayar', [
+            MidtransController::class,
+            'paymentPage'
+        ])->name('payments.pay');
+
+        Route::get('/pembayaran/{payment}/berhasil', [
+            MidtransController::class,
+            'paymentSuccess'
+        ])->name('payments.success');
 
         Route::post('/pembayaran/{payment}/bukti', [
             UserController::class,
@@ -299,6 +330,17 @@ Route::middleware([CekLogin::class, 'role:user'])
             UserController::class,
             'openMatchChatSend'
         ])->name('openmatches.chat.send');
+
+        /*
+        |--------------------------------------------------------------------------
+        | EVENT & TURNAMEN RESMI
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('/event/{event}/daftar', [
+            UserController::class,
+            'eventRegister'
+        ])->name('events.register');
 
         /*
         |--------------------------------------------------------------------------
@@ -377,12 +419,18 @@ Route::middleware([CekLogin::class, 'role:superadmin,venue_admin'])
             ->name('dashboard');
 
         // Notifikasi Admin dan Superadmin
+        Route::get('/notifikasi', [AdminController::class, 'notifications'])
+            ->name('notifications');
         Route::post('/notifikasi/{notification}/read', [AdminController::class, 'notificationRead'])
             ->name('notifications.read');
+        Route::post('/notifikasi/{notification}/mark-read', [AdminController::class, 'notificationMarkRead'])
+            ->name('notifications.mark-read');
         Route::post('/notifikasi/read-all', [AdminController::class, 'notificationsReadAll'])
             ->name('notifications.read-all');
         Route::delete('/notifikasi/clear', [AdminController::class, 'notificationsClear'])
             ->name('notifications.clear');
+        Route::delete('/notifikasi/{notification}', [AdminController::class, 'notificationDelete'])
+            ->name('notifications.delete');
         Route::get('/api/notifications', [AdminController::class, 'apiNotifications'])
             ->name('api.notifications');
 
@@ -472,6 +520,12 @@ Route::middleware([CekLogin::class, 'role:superadmin,venue_admin'])
                 'processWithdrawal'
             ])->name('venue-withdrawals.process');
 
+            // Manajemen venue (superadmin)
+            Route::get('/venues-manage', [AdminController::class, 'venuesManage'])
+                ->name('venues.manage');
+            Route::get('/venues-manage/{venue}', [AdminController::class, 'venueManageShow'])
+                ->name('venues.manage.show');
+
             // Rewards
             Route::get('/rewards', [AdminController::class, 'rewards'])
                 ->name('rewards');
@@ -559,6 +613,16 @@ Route::middleware([CekLogin::class, 'role:superadmin,venue_admin'])
         Route::resource('/events', EventController::class)
             ->except(['show'])
             ->names('events');
+
+        Route::get('/events/{event}/pendaftar', [
+            EventController::class,
+            'registrations'
+        ])->name('events.registrations');
+
+        Route::post('/events/{event}/pendaftar/{registration}/status', [
+            EventController::class,
+            'updateRegistrationStatus'
+        ])->name('events.registrations.status');
 
         Route::get('/open-match', [
             AdminController::class,
@@ -745,3 +809,8 @@ Route::middleware([CekLogin::class, 'role:superadmin,venue_admin'])
     ChatbotController::class,
     'nearbyVenues'
 ])->name('chatbot.nearby-venues');
+
+    Route::post('/chatbot/reply', [
+        ChatbotController::class,
+        'reply'
+    ])->name('chatbot.reply');

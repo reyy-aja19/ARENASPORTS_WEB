@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Venue;
+use App\Services\GeminiChatbotService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -134,6 +135,26 @@ class ChatbotController extends Controller
             'success' => true,
             'total' => count($results),
             'venues' => array_slice($results, 0, 5),
+        ]);
+    }
+
+    public function reply(Request $request, GeminiChatbotService $gemini)
+    {
+        $data = $request->validate([
+            'message' => ['required', 'string', 'max:500'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+        ]);
+
+        $reply = $gemini->reply(
+            $data['message'],
+            isset($data['latitude']) ? (float) $data['latitude'] : null,
+            isset($data['longitude']) ? (float) $data['longitude'] : null,
+        );
+
+        return response()->json([
+            'success' => true,
+            'reply' => $reply,
         ]);
     }
 }

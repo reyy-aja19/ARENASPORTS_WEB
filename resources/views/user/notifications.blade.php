@@ -74,12 +74,17 @@
                     @if(!$notification->read_at)
                         <form method="POST" action="{{ route('user.notifications.mark-read', $notification->id) }}">
                             @csrf
-                            <button class="notif-action" type="submit"><i class="fa-solid fa-check"></i> Tandai sudah dibaca</button>
+                            <button class="notif-action" type="submit"><i class="fa-solid fa-check"></i> Tandai dibaca</button>
                         </form>
                     @endif
                     <form method="POST" action="{{ route('user.notifications.read', $notification->id) }}">
                         @csrf
                         <button class="notif-action" type="submit"><i class="fa-regular fa-folder-open"></i> Buka</button>
+                    </form>
+                    <form method="POST" action="{{ route('user.notifications.delete', $notification->id) }}" onsubmit="return confirm('Hapus notifikasi ini?');">
+                        @csrf
+                        @method('DELETE')
+                        <button class="notif-action danger" type="submit"><i class="fa-regular fa-trash-can"></i> Hapus</button>
                     </form>
                 </div>
             </article>
@@ -93,5 +98,13 @@
     </div>
 
     <div class="notif-pagination">{{ $notifications->links() }}</div>
+    <style>
+        .notif-pagination nav{display:flex;justify-content:center;margin-top:20px}
+        .notif-pagination .pagination{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0}
+        .notif-pagination .page-item .page-link,.notif-pagination .page-item span{display:inline-flex;align-items:center;justify-content:center;min-width:38px;height:38px;padding:0 12px;border-radius:10px;border:1px solid #dce8e0;background:#fff;color:#17633e;font-size:13px;font-weight:700;text-decoration:none}
+        .notif-pagination .page-item.active .page-link,.notif-pagination .page-item.active span{background:#17633e;color:#fff;border-color:#17633e}
+        .notif-pagination .page-item.disabled .page-link,.notif-pagination .page-item.disabled span{opacity:.45;color:#8a968e}
+        .notif-pagination .page-item .page-link:hover{background:#f2f8f4}
+    </style>
 </div>
 @endsection

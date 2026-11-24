@@ -297,16 +297,22 @@
 
             <div class="u-register-options">
 
+                {{-- Daftar WhatsApp --}}
+                <a href="{{ route('phone.register') }}">
+                    <i class="fa-brands fa-whatsapp"></i>
+                    Daftar dengan WhatsApp
+                </a>
+
                 {{-- Daftar Google --}}
                 <a href="{{ route('auth.google.redirect') }}">
                     <i class="fa-brands fa-google"></i>
                     Daftar dengan Google
                 </a>
 
-                {{-- Daftar WhatsApp --}}
-                <a href="{{ route('phone.register') }}">
-                    <i class="fa-brands fa-whatsapp"></i>
-                    Daftar dengan WhatsApp
+                {{-- Daftar Apple --}}
+                <a href="{{ route('auth.apple.redirect') }}">
+                    <i class="fa-brands fa-apple"></i>
+                    Lanjutkan dengan Apple
                 </a>
 
             </div>
@@ -326,6 +332,8 @@
     </section>
 
 </main>
+
+@include('layouts.partials.site-footer')
 
 </body>
 </html>

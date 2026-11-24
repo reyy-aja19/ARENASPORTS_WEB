@@ -1034,6 +1034,17 @@ public function availability(
             'processed_at' => now()
         ]);
 
+        $withdrawal->loadMissing('user', 'venue');
+        if ($withdrawal->user) {
+            $withdrawal->user->notify(new ArenaUserNotification(
+                'Status Penarikan Diperbarui',
+                'Permintaan penarikan dana venue ' . ($withdrawal->venue?->name ?? '') .
+                    ' sebesar Rp ' . number_format((int) $withdrawal->amount, 0, ',', '.') .
+                    ' kini berstatus ' . $status . '.',
+                route('admin.venue-finance', [], false)
+            ));
+        }
+
         return back()->with(
             'success',
             'Status penarikan diperbarui menjadi ' . $status . '.'

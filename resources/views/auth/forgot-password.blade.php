@@ -112,5 +112,6 @@
             <i class="fa-solid fa-arrow-left"></i> Kembali ke Login
         </a>
     </main>
+@include('layouts.partials.site-footer')
 </body>
 </html>

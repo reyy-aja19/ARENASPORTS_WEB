@@ -116,5 +116,6 @@
             <button type="submit">Simpan Password Baru</button>
         </form>
     </main>
+@include('layouts.partials.site-footer')
 </body>
 </html>

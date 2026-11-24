@@ -106,6 +106,9 @@
                         </td>
                         <td>
                             <div class="btn-row wrap">
+                                <a class="btn-ui btn-gray" href="{{ route('admin.events.registrations', $event) }}" style="padding:6px 12px; font-size:12px;">
+                                    <i class="fa-solid fa-users"></i> Pendaftar ({{ $event->registrations_count ?? 0 }})
+                                </a>
                                 <a class="btn-ui btn-green" href="{{ route('admin.events.edit', $event) }}" style="padding:6px 12px; font-size:12px;">
                                     <i class="fa-solid fa-pen"></i> Edit
                                 </a>

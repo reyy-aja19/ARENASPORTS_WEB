@@ -62,6 +62,14 @@ class UserNotificationController extends Controller
         return back()->with('success', 'Semua notifikasi sudah ditandai dibaca.');
     }
 
+    public function delete(Request $request, string $notification): RedirectResponse
+    {
+        $user = $this->currentUser($request);
+        $user->notifications()->where('id', $notification)->delete();
+
+        return back()->with('success', 'Notifikasi berhasil dihapus.');
+    }
+
     public function clear(Request $request): RedirectResponse
     {
         $user = $this->currentUser($request);

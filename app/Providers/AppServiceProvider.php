@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
@@ -19,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        Paginator::useBootstrapFive();
+
         // Rate limit semua permintaan API (mobile + guest).
         // Kunci: token Bearer (per perangkat), email/identifier saat login, IP sebagai fallback.
         RateLimiter::for('api', function (Request $request) {
@@ -82,6 +85,7 @@ class AppServiceProvider extends ServiceProvider
 
                 $dbNotifs = $adminUser ? $adminUser->unreadNotifications()->latest()->take(10)->get()->map(function ($n) {
                     return [
+                        'id' => $n->id,
                         'type' => 'system',
                         'icon' => 'fa-solid fa-bell',
                         'label' => $n->data['title'] ?? 'Notifikasi Sistem',
@@ -89,6 +93,7 @@ class AppServiceProvider extends ServiceProvider
                         'time' => optional($n->created_at)->diffForHumans(),
                         'sort_at' => optional($n->created_at)?->timestamp ?? 0,
                         'url' => $n->data['url'] ?? route('admin.dashboard'),
+                        'read_at' => $n->read_at,
                     ];
                 }) : collect();
 

@@ -28,17 +28,33 @@ class PasswordResetController extends Controller
             'email' => ['required', 'email'],
         ]);
 
-        $status = Password::sendResetLink(
-            $request->only('email')
-        );
+        try {
+            $status = Password::sendResetLink(
+                $request->only('email')
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Password reset email gagal dikirim', [
+                'email' => $request->input('email'),
+                'message' => $e->getMessage(),
+            ]);
 
-        if ($status === Password::RESET_LINK_SENT) {
-            return back()->with('status', __($status));
+            return back()->withErrors([
+                'email' => 'Gagal mengirim email reset password. Periksa konfigurasi SMTP/mail server.',
+            ]);
         }
 
-        return back()->withErrors([
-            'email' => __($status),
-        ]);
+        if ($status === Password::RESET_LINK_SENT) {
+            return back()->with('status', 'Jika email terdaftar, tautan reset password telah dikirim. Silakan cek inbox/spam.');
+        }
+
+        if ($status === Password::RESET_THROTTLED) {
+            return back()->withErrors([
+                'email' => 'Permintaan reset terlalu sering. Silakan tunggu beberapa saat sebelum mencoba lagi.',
+            ]);
+        }
+
+        // Jangan bocorkan apakah email terdaftar.
+        return back()->with('status', 'Jika email terdaftar, tautan reset password akan dikirim. Silakan cek inbox/spam.');
     }
 
     /**

@@ -60,6 +60,42 @@
             </div>
 
             <div class="form-group">
+                <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Biaya Registrasi per Tim</label>
+                <input class="input-ui" type="number" name="registration_fee" min="0" max="999999999" value="{{ old('registration_fee', $event->registration_fee ?? 0) }}" placeholder="0 = gratis">
+                <small style="color:#718078; margin-top:4px; display:block;">Isi 0 jika event gratis.</small>
+            </div>
+
+            <div class="form-group">
+                <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Hadiah / Prize Pool</label>
+                <input class="input-ui" name="prize" maxlength="255" value="{{ old('prize', $event->prize) }}" placeholder="Contoh: Juara 1 Rp 5.000.000 + trofi">
+            </div>
+
+            <div class="form-group">
+                <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">WhatsApp Penyelenggara</label>
+                <input class="input-ui" name="contact_phone" maxlength="30" value="{{ old('contact_phone', $event->contact_phone) }}" placeholder="08xxxxxxxxxx">
+                <small style="color:#718078; margin-top:4px; display:block;">Nomor ini dipakai untuk tombol "Lanjut WhatsApp" setelah user mendaftar.</small>
+            </div>
+
+            <div class="form-group">
+                <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Batas Pendaftaran</label>
+                <input class="input-ui" type="date" name="registration_deadline" min="{{ now()->toDateString() }}" value="{{ old('registration_deadline', $event->registration_deadline?->format('Y-m-d')) }}">
+                <small style="color:#718078; margin-top:4px; display:block;">Kosongkan jika pendaftaran dibuka sampai hari acara.</small>
+            </div>
+
+            <div class="form-group">
+                <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Venue Terkait (untuk peta)</label>
+                <select class="select-ui" name="venue_id">
+                    <option value="">— Tidak dikaitkan —</option>
+                    @foreach(($venues ?? collect()) as $v)
+                        <option value="{{ $v->id }}" @selected((string) old('venue_id', $event->venue_id) === (string) $v->id)>
+                            {{ $v->name }}
+                        </option>
+                    @endforeach
+                </select>
+                <small style="color:#718078; margin-top:4px; display:block;">Pilih venue agar koordinat/peta lokasi tampil di halaman user.</small>
+            </div>
+
+            <div class="form-group">
                 <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Jam Mulai (Opsional)</label>
                 <input class="input-ui" type="time" name="start_time" value="{{ old('start_time', $event->start_time ? substr($event->start_time, 0, 5) : '08:00') }}">
             </div>

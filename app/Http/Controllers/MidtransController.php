@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
 
@@ -79,11 +80,8 @@ class MidtransController extends Controller
             $payment->snap_token
             && ($payment->midtrans_order_id || $payment->transaction_id)
         ) {
-            $host = $isProduction
-                ? 'https://app.midtrans.com/snap/v2/vtweb/'
-                : 'https://app.sandbox.midtrans.com/snap/v2/vtweb/';
-
-            return redirect()->away($host . $payment->snap_token);
+            // Token masih berlaku: tampilkan halaman Snap.js di website.
+            return redirect()->route('user.payments.pay', $payment);
         }
 
         $customer = User::find($userId);
@@ -92,14 +90,23 @@ class MidtransController extends Controller
             . '-TRY-' . now()->format('YmdHis')
             . '-' . bin2hex(random_bytes(3));
 
+        $customerDetails = [
+            'first_name' => $customer?->name ?? 'ArenaSports User',
+            'email' => $customer?->email ?? '',
+        ];
+
+        if ($phone = $this->normalizePhone($customer?->phone)) {
+            $customerDetails['phone'] = $phone;
+        }
+
         $params = [
             'transaction_details' => [
                 'order_id' => $orderId,
                 'gross_amount' => $amount,
             ],
-            'customer_details' => [
-                'first_name' => $customer?->name ?? 'ArenaSports User',
-                'email' => $customer?->email ?? '',
+            'customer_details' => $customerDetails,
+            'callbacks' => [
+                'finish' => route('user.payments.status', $payment),
             ],
             'item_details' => [[
                 'id' => 'booking-' . $booking->id,
@@ -152,7 +159,7 @@ class MidtransController extends Controller
                 );
             }
 
-            return redirect()->away($snap->redirect_url);
+            return redirect()->route('user.payments.pay', $payment);
         } catch (Throwable $e) {
             Log::error('Midtrans checkout booking error', [
                 'payment_id' => $payment->id,
@@ -237,11 +244,7 @@ class MidtransController extends Controller
             $payment->snap_token
             && ($payment->midtrans_order_id || $payment->transaction_id)
         ) {
-            $host = $isProduction
-                ? 'https://app.midtrans.com/snap/v2/vtweb/'
-                : 'https://app.sandbox.midtrans.com/snap/v2/vtweb/';
-
-            return redirect()->away($host . $payment->snap_token);
+            return redirect()->route('user.payments.pay', $payment);
         }
 
         $customer = User::find($userId);
@@ -255,9 +258,13 @@ class MidtransController extends Controller
                 'order_id' => $orderId,
                 'gross_amount' => $amount,
             ],
-            'customer_details' => [
+            'customer_details' => array_filter([
                 'first_name' => $customer?->name ?? 'ArenaSports User',
                 'email' => $customer?->email ?? '',
+                'phone' => $this->normalizePhone($customer?->phone),
+            ]),
+            'callbacks' => [
+                'finish' => route('user.payments.status', $payment),
             ],
             'item_details' => [[
                 'id' => 'extension-' . $extension->id,
@@ -310,7 +317,7 @@ class MidtransController extends Controller
                 );
             }
 
-            return redirect()->away($snap->redirect_url);
+            return redirect()->route('user.payments.pay', $payment);
         } catch (Throwable $e) {
             Log::error('Midtrans extension checkout error', [
                 'extension_id' => $extension->id,
@@ -324,6 +331,123 @@ class MidtransController extends Controller
                 'Gagal membuat pembayaran perpanjangan.'
             );
         }
+    }
+
+    /**
+     * HALAMAN PEMBAYARAN SNAP.JS (TETAP DI WEBSITE)
+     */
+    public function paymentPage(
+        Request $request,
+        Payment $payment
+    ): View|RedirectResponse {
+        $this->authorizePayment($request, $payment);
+
+        $payment->load([
+            'booking.lapangan.venue',
+            'extension.booking.lapangan.venue',
+        ]);
+
+        if ($this->paymentIsPaid($payment)) {
+            return redirect()->route('user.payments.success', $payment);
+        }
+
+        if (!$payment->snap_token) {
+            return redirect()->route('user.bookings')->with(
+                'error',
+                'Token pembayaran tidak ditemukan. Silakan ulangi pembayaran.'
+            );
+        }
+
+        $clientKey = (string) config('services.midtrans.client_key');
+
+        abort_if(
+            $clientKey === '',
+            503,
+            'Midtrans belum dikonfigurasi.'
+        );
+
+        return view('user.midtrans-payment', [
+            'payment' => $payment,
+            'booking' => $payment->booking,
+            'extension' => $payment->extension,
+            'amount' => (int) $payment->amount,
+            'clientKey' => $clientKey,
+            'isProduction' => (bool) config(
+                'services.midtrans.is_production'
+            ),
+            'statusUrl' => route('user.payments.status', $payment),
+            'successUrl' => route('user.payments.success', $payment),
+        ]);
+    }
+
+    /**
+     * SINKRONISASI STATUS SETELAH POPUP SNAP DITUTUP.
+     */
+    public function paymentStatus(
+        Request $request,
+        Payment $payment
+    ): RedirectResponse {
+        $this->authorizePayment($request, $payment);
+
+        if ($this->paymentIsPaid($payment)) {
+            return redirect()->route('user.payments.success', $payment);
+        }
+
+        $this->refreshPaymentFromMidtrans($payment);
+        $payment->refresh();
+
+        if ($this->paymentIsPaid($payment)) {
+            return redirect()
+                ->route('user.payments.success', $payment)
+                ->with('success', 'Pembayaran berhasil diterima.');
+        }
+
+        if (strtolower((string) $payment->status) === 'menunggu') {
+            return redirect()
+                ->route('user.bookings')
+                ->with(
+                    'success',
+                    'Pembayaran masih menunggu. Selesaikan pembayaran sebelum batas waktu.'
+                );
+        }
+
+        return redirect()
+            ->route('user.bookings')
+            ->with(
+                'error',
+                'Pembayaran belum selesai atau gagal. Silakan coba lagi.'
+            );
+    }
+
+    /**
+     * HALAMAN PEMBAYARAN BERHASIL.
+     */
+    public function paymentSuccess(
+        Request $request,
+        Payment $payment
+    ): View|RedirectResponse {
+        $this->authorizePayment($request, $payment);
+
+        $payment->load([
+            'booking.lapangan.venue',
+            'extension.booking.lapangan.venue',
+        ]);
+
+        if (!$this->paymentIsPaid($payment)) {
+            return redirect()
+                ->route('user.bookings')
+                ->with(
+                    'error',
+                    'Pembayaran belum selesai. Status masih menunggu.'
+                );
+        }
+
+        return view('user.payment-success', [
+            'payment' => $payment,
+            'booking' => $payment->booking,
+            'extension' => $payment->extension,
+            'amount' => (int) $payment->amount,
+        ]);
     }
 
     /**
@@ -380,9 +504,10 @@ class MidtransController extends Controller
             return response()->json(['ok' => false], 403);
         }
 
-        if (!$this->findPaymentByOrderId($orderId)->exists()) {
+        if (!$this->locatePayment($orderId, $midtransTransactionId)) {
             Log::warning('Order ID Midtrans tidak ditemukan.', [
                 'order_id' => $orderId,
+                'transaction_id' => $midtransTransactionId,
             ]);
 
             return response()->json([
@@ -397,7 +522,11 @@ class MidtransController extends Controller
                 (bool) config('services.midtrans.is_production')
             );
 
-            $verified = \Midtrans\Transaction::status(
+            $payment = $this->locatePayment($orderId, $midtransTransactionId);
+
+            $verified = $this->fetchVerifiedStatus(
+                $payment,
+                $orderId,
                 $midtransTransactionId
             );
 
@@ -417,9 +546,6 @@ class MidtransController extends Controller
             $verifiedFraud = strtolower(
                 (string) ($verified->fraud_status ?? '')
             );
-            $verifiedPaymentType = strtolower(
-                (string) ($verified->payment_type ?? '')
-            );
 
             if (
                 $verifiedTransactionId === ''
@@ -430,15 +556,17 @@ class MidtransController extends Controller
                 );
             }
 
-            $isDanaOrderIdFallback =
-                $verifiedPaymentType === 'dana'
-                && $verifiedOrderId === $verifiedTransactionId
-                && $verifiedTransactionId === $midtransTransactionId;
+            // DANA (dan beberapa metode e-wallet lain) dapat mengirim
+            // order_id yang sama dengan transaction_id. Terima bila salah satu
+            // identitas yang tersimpan lokal cocok dengan payload terverifikasi.
+            $allowedOrderIds = array_values(array_unique(array_filter([
+                $payment->midtrans_order_id,
+                $payment->transaction_id,
+                $orderId,
+                $midtransTransactionId,
+            ])));
 
-            if (
-                $verifiedOrderId !== $orderId
-                && !$isDanaOrderIdFallback
-            ) {
+            if (!in_array($verifiedOrderId, $allowedOrderIds, true)) {
                 throw new RuntimeException(
                     'Order ID dari API Midtrans tidak cocok.'
                 );
@@ -464,9 +592,12 @@ class MidtransController extends Controller
             $statusCode = $verifiedStatusCode;
             $grossAmount = $verifiedGrossAmount;
 
-            // Ambil tipe transaksi dari database.
-            $payment = $this->findPaymentByOrderId($orderId)
-                ->firstOrFail();
+            // Gunakan order_id asli milik transaksi agar helper pembayaran
+            // tetap menemukan record yang benar, termasuk kasus DANA.
+            $effectiveOrderId = (string) (
+                $payment->midtrans_order_id
+                ?: ($verifiedOrderId ?: $orderId)
+            );
 
             if ($this->isSuccessfulStatus(
                 $statusCode,
@@ -475,20 +606,20 @@ class MidtransController extends Controller
             )) {
                 if ($payment->booking_extension_id) {
                     $this->markExtensionPaymentAsPaid(
-                        $orderId,
+                        $effectiveOrderId,
                         $midtransTransactionId,
                         $grossAmount
                     );
                 } else {
                     $this->markPaymentAsPaid(
-                        $orderId,
+                        $effectiveOrderId,
                         $midtransTransactionId,
                         $grossAmount
                     );
                 }
             } else {
                 $this->handleUnsuccessfulPayment(
-                    $orderId,
+                    $effectiveOrderId,
                     $midtransTransactionId,
                     $transactionStatus
                 );
@@ -769,7 +900,7 @@ class MidtransController extends Controller
                         'Pembayaran ' . $label,
                         'Pembayaran booking #' . $booking->id
                             . ' ' . strtolower($label) . '.',
-                        route('user.payments', [], false)
+                        route('user.bookings', [], false)
                     ));
                 }
             }
@@ -864,15 +995,201 @@ class MidtransController extends Controller
     }
 
     /**
-     * CARI PEMBAYARAN BERDASARKAN ORDER ID
+     * CARI PEMBAYARAN BERDASARKAN ORDER ID / TRANSACTION ID
      */
     private function findPaymentByOrderId(string $orderId)
     {
         return Payment::where('midtrans_order_id', $orderId)
-            ->orWhere(function ($query) use ($orderId): void {
-                $query->whereNull('midtrans_order_id')
-                    ->where('transaction_id', $orderId);
-            });
+            ->orWhere('transaction_id', $orderId);
+    }
+
+    /**
+     * Cari pembayaran lokal dari order_id maupun transaction_id.
+     */
+    private function locatePayment(
+        string $orderId,
+        string $transactionId = ''
+    ): ?Payment {
+        $query = Payment::query();
+
+        $query->where(function ($inner) use ($orderId, $transactionId): void {
+            $inner->where('midtrans_order_id', $orderId)
+                ->orWhere('transaction_id', $orderId);
+
+            if ($transactionId !== '') {
+                $inner->orWhere('midtrans_order_id', $transactionId)
+                    ->orWhere('transaction_id', $transactionId);
+            }
+        });
+
+        return $query->latest('id')->first();
+    }
+
+    /**
+     * Ambil status terverifikasi dari Midtrans dengan beberapa kandidat ID.
+     */
+    private function fetchVerifiedStatus(
+        Payment $payment,
+        string $orderId,
+        string $transactionId
+    ): object {
+        $candidates = array_values(array_unique(array_filter([
+            $payment->midtrans_order_id,
+            $orderId,
+            $payment->transaction_id,
+            $transactionId,
+        ])));
+
+        $lastError = null;
+
+        foreach ($candidates as $candidate) {
+            try {
+                $status = \Midtrans\Transaction::status((string) $candidate);
+                $verifiedId = (string) ($status->transaction_id ?? '');
+
+                if (
+                    $transactionId !== ''
+                    && $verifiedId !== ''
+                    && $verifiedId !== $transactionId
+                ) {
+                    continue;
+                }
+
+                return $status;
+            } catch (Throwable $e) {
+                $lastError = $e;
+            }
+        }
+
+        throw new RuntimeException(
+            'Status Midtrans tidak dapat diverifikasi: '
+            . ($lastError?->getMessage() ?? 'kandidat ID kosong.')
+        );
+    }
+
+    /**
+     * PASTIKAN PEMBAYARAN MILIK USER YANG SEDANG LOGIN.
+     */
+    private function authorizePayment(Request $request, Payment $payment): void
+    {
+        $payment->loadMissing(['booking', 'extension']);
+
+        $userId = (int) $request->session()->get('admin_user_id');
+        $ownerId = (int) (
+            $payment->user_id
+            ?: ($payment->booking?->user_id ?? $payment->extension?->user_id)
+        );
+
+        abort_unless($userId > 0 && $ownerId === $userId, 403);
+    }
+
+    private function paymentIsPaid(Payment $payment): bool
+    {
+        return in_array(
+            strtolower((string) $payment->status),
+            ['lunas', 'settlement', 'capture', 'success', 'selesai'],
+            true
+        );
+    }
+
+    /**
+     * Ambil status terbaru dari Midtrans lalu sinkronkan ke database.
+     */
+    private function refreshPaymentFromMidtrans(Payment $payment): void
+    {
+        $serverKey = (string) config('services.midtrans.server_key');
+
+        if ($serverKey === '') {
+            return;
+        }
+
+        $this->configureMidtrans(
+            $serverKey,
+            (bool) config('services.midtrans.is_production')
+        );
+
+        try {
+            $status = $this->fetchVerifiedStatus(
+                $payment,
+                (string) ($payment->midtrans_order_id ?? ''),
+                (string) ($payment->transaction_id ?? '')
+            );
+        } catch (Throwable $e) {
+            Log::warning('Gagal mengambil status Midtrans.', [
+                'payment_id' => $payment->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return;
+        }
+
+        $transactionId = (string) ($status->transaction_id ?? '');
+        $orderId = (string) (
+            $payment->midtrans_order_id
+            ?: ($status->order_id ?? '')
+        );
+        $statusCode = (string) ($status->status_code ?? '');
+        $grossAmount = (string) ($status->gross_amount ?? '');
+        $transactionStatus = strtolower(
+            (string) ($status->transaction_status ?? '')
+        );
+        $fraudStatus = strtolower(
+            (string) ($status->fraud_status ?? '')
+        );
+
+        if ($orderId === '' || $transactionId === '') {
+            return;
+        }
+
+        if ($this->isSuccessfulStatus(
+            $statusCode,
+            $transactionStatus,
+            $fraudStatus
+        )) {
+            if ($payment->booking_extension_id) {
+                $this->markExtensionPaymentAsPaid(
+                    $orderId,
+                    $transactionId,
+                    $grossAmount
+                );
+            } else {
+                $this->markPaymentAsPaid(
+                    $orderId,
+                    $transactionId,
+                    $grossAmount
+                );
+            }
+
+            return;
+        }
+
+        $this->handleUnsuccessfulPayment(
+            $orderId,
+            $transactionId,
+            $transactionStatus
+        );
+    }
+
+    /**
+     * Normalisasi nomor telepon ke format 62xxxxxxxxxx.
+     */
+    private function normalizePhone(?string $phone): string
+    {
+        $digits = preg_replace('/[^0-9]/', '', (string) $phone) ?? '';
+
+        if ($digits === '') {
+            return '';
+        }
+
+        if (str_starts_with($digits, '0')) {
+            return '62' . substr($digits, 1);
+        }
+
+        if (str_starts_with($digits, '8')) {
+            return '62' . $digits;
+        }
+
+        return $digits;
     }
 
     /**

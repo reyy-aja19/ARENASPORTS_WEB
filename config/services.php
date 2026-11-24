@@ -3,6 +3,19 @@
 return [
     'midtrans' => ['server_key' => env('MIDTRANS_SERVER_KEY'), 'client_key' => env('MIDTRANS_CLIENT_KEY'), 'is_production' => env('MIDTRANS_IS_PRODUCTION', false)],
     'google' => ['client_id' => env('GOOGLE_CLIENT_ID'), 'client_secret' => env('GOOGLE_CLIENT_SECRET'), 'redirect' => env('GOOGLE_REDIRECT_URI', env('APP_URL').'/auth/google/callback')],
+    'apple' => [
+        'client_id' => env('APPLE_CLIENT_ID'),
+        'client_secret' => env('APPLE_CLIENT_SECRET'),
+        'team_id' => env('APPLE_TEAM_ID'),
+        'key_id' => env('APPLE_KEY_ID'),
+        'private_key' => env('APPLE_PRIVATE_KEY'),
+        'redirect' => env('APPLE_REDIRECT_URI', env('APP_URL').'/auth/apple/callback'),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-flash-lite-latest'),
+    ],
     'fonnte' => [
         'token' => env('FONNTE_TOKEN'),
         'endpoint' => env('FONNTE_ENDPOINT', 'https://api.fonnte.com/send'),

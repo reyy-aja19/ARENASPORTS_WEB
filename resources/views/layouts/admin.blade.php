@@ -89,12 +89,19 @@
                 <a class="sidebar-link {{ request()->routeIs('admin.venue-register*') ? 'active' : '' }}" href="{{ route('admin.venue-register') }}"><span class="menu-icon"><i class="fa-solid fa-circle-plus"></i></span><span class="label">Daftarkan Venue Baru</span></a>
                 <a class="sidebar-link {{ request()->routeIs('admin.venue-profile*') ? 'active' : '' }}" href="{{ route('admin.venue-profile') }}"><span class="menu-icon"><i class="fa-solid fa-store"></i></span><span class="label">Profil Venue</span></a>
                 <a class="sidebar-link {{ request()->routeIs('admin.venue-finance*') ? 'active' : '' }}" href="{{ route('admin.venue-finance') }}"><span class="menu-icon"><i class="fa-solid fa-wallet"></i></span><span class="label">Saldo & Penarikan</span></a>
+                <a class="sidebar-link {{ request()->routeIs('admin.courts*') ? 'active' : '' }}"
+                   href="{{ route('admin.courts') }}">
+                    <span class="menu-icon"><i class="fa-solid fa-vector-square"></i></span>
+                    <span class="label">Management Lapangan</span>
+                </a>
             @endif
-            <a class="sidebar-link {{ request()->routeIs('admin.courts*') ? 'active' : '' }}"
-               href="{{ route('admin.courts') }}">
-                <span class="menu-icon"><i class="fa-solid fa-vector-square"></i></span>
-                <span class="label">Management Lapangan</span>
-            </a>
+            @if($isSuperAdmin)
+                <a class="sidebar-link {{ request()->routeIs('admin.venues.manage*') ? 'active' : '' }}"
+                   href="{{ route('admin.venues.manage') }}">
+                    <span class="menu-icon"><i class="fa-solid fa-building-circle-check"></i></span>
+                    <span class="label">Manajemen Venue</span>
+                </a>
+            @endif
             @if($isAdmin)
     <a class="sidebar-link {{ request()->routeIs('admin.bookings*') ? 'active' : '' }}"
        href="{{ route('admin.bookings') }}">
@@ -183,31 +190,13 @@
         </nav>
     </aside>
 
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
     <main class="main-panel">
         <header class="topbar">
-            <form class="search-wrap search-clean"
-                  action=""
-                  method="GET"
-                  id="adminGlobalSearch">
-                <i class="fa-solid fa-magnifying-glass"></i>
-
-                <input
-                    type="text"
-                    name="q"
-                    value="{{ request('q') }}"
-                    placeholder="Search..."
-                    data-global-search
-                    autocomplete="off"
-                >
-
-                <button type="button" id="adminSearchClear" aria-label="Hapus Pencarian" style="display: none; background: transparent; border: none; cursor: pointer; color: #94a3b8; padding: 0 8px; font-size: 14px;">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-
-                <button type="submit" aria-label="Search">
-                    <i class="fa-solid fa-arrow-right"></i>
-                </button>
-            </form>
+            <button type="button" class="sidebar-toggle" id="sidebarToggle" aria-label="Buka menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <div class="topbar-spacer" style="flex:1;"></div>
 
             <div class="topbar-right">
                 <a href="{{ route('user.home') }}" class="btn-ui btn-gray" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:7px 12px; border-radius:10px;" title="Lihat aplikasi dari sisi pemain/pembeli">
@@ -229,30 +218,47 @@
                     </button>
 
                     <div class="notification-panel" id="notificationPanel">
-                        <div class="notification-title">Notifikasi</div>
+                        <div class="notification-title" style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+                            <span>Notifikasi</span>
+                            <a href="{{ route('admin.notifications') }}" style="font-size:11px;color:#187044;font-weight:700;text-decoration:none;">Lihat semua</a>
+                        </div>
 
                         <div class="notification-list">
                             @forelse($notifications as $notification)
-                                <a
-                                    href="{{ $notification['url'] ?? '#' }}"
-                                    class="notification-item anim-click"
-                                >
-                                    <div class="notification-icon">
-                                        <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}"></i>
-                                    </div>
-
-                                    <div class="notification-copy">
-                                        <strong>{{ $notification['label'] ?? 'Notifikasi' }}</strong>
-                                        <span>{{ $notification['meta'] ?? '' }}</span>
-                                    </div>
-
-                                    <small>{{ $notification['time'] ?? '' }}</small>
-                                </a>
+                                @if(($notification['type'] ?? '') === 'system' && !empty($notification['id']))
+                                    <form method="POST" action="{{ route('admin.notifications.read', $notification['id']) }}" style="margin:0;">
+                                        @csrf
+                                        <button type="submit" class="notification-item anim-click" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font:inherit;">
+                                            <div class="notification-icon">
+                                                <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}"></i>
+                                            </div>
+                                            <div class="notification-copy">
+                                                <strong>{{ $notification['label'] ?? 'Notifikasi' }}</strong>
+                                                <span>{{ $notification['meta'] ?? '' }}</span>
+                                            </div>
+                                            <small>{{ $notification['time'] ?? '' }}</small>
+                                        </button>
+                                    </form>
+                                @else
+                                    <a href="{{ $notification['url'] ?? '#' }}" class="notification-item anim-click">
+                                        <div class="notification-icon">
+                                            <i class="{{ $notification['icon'] ?? 'fa-regular fa-bell' }}"></i>
+                                        </div>
+                                        <div class="notification-copy">
+                                            <strong>{{ $notification['label'] ?? 'Notifikasi' }}</strong>
+                                            <span>{{ $notification['meta'] ?? '' }}</span>
+                                        </div>
+                                        <small>{{ $notification['time'] ?? '' }}</small>
+                                    </a>
+                                @endif
                             @empty
                                 <div class="notification-empty">
                                     Belum ada notifikasi baru.
                                 </div>
                             @endforelse
+                        </div>
+                        <div style="padding:10px 14px;border-top:1px solid #edf2ee;text-align:center;">
+                            <a href="{{ route('admin.notifications') }}" style="font-size:12px;color:#187044;font-weight:700;text-decoration:none;">Buka halaman notifikasi</a>
                         </div>
                     </div>
                 </div>
@@ -321,6 +327,15 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    const sidebar = document.querySelector('.sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    function closeSidebar() { document.body.classList.remove('sidebar-open'); }
+    if (sidebarToggle) sidebarToggle.addEventListener('click', function (e) { e.preventDefault(); document.body.classList.toggle('sidebar-open'); });
+    if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+    if (sidebar) sidebar.querySelectorAll('a.sidebar-link').forEach(function (a) { a.addEventListener('click', function () { if (window.innerWidth <= 992) closeSidebar(); }); });
+    window.addEventListener('resize', function () { if (window.innerWidth > 992) closeSidebar(); });
+
     const notificationWrap = document.querySelector('.notification-wrap');
     const notificationToggle = document.querySelector('[data-notification-toggle]');
     const notificationPanel = document.getElementById('notificationPanel');
@@ -374,83 +389,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    const searchInput = document.querySelector('[data-global-search]');
-    const searchForm = document.getElementById('adminGlobalSearch');
-    const searchClear = document.getElementById('adminSearchClear');
-
-    const localInputs = document.querySelectorAll(
-        '[data-local-filter], [data-global-search]'
-    );
-
-    function normalize(value) {
-        return (value || '').toString().toLowerCase().trim();
-    }
-
-    function applyFilter() {
-        const q = normalize(searchInput?.value);
-        if (searchClear) {
-            searchClear.style.display = q ? 'inline-block' : 'none';
-        }
-
-        const jenis = normalize(
-            document.querySelector('[data-local-filter-select="jenis"]')?.value
-        );
-        const status = normalize(
-            document.querySelector('[data-local-filter-select="status"]')?.value
-        );
-
-        // Targetkan seluruh komponen tabel / kartu tanpa memecah row accordion perpanjangan
-        const items = document.querySelectorAll(
-            '[data-search-item], .data-table tbody tr:not([id^="extension-"]):not(.extension-row), ' +
-            '.marketplace-table tbody tr, .cc-table tbody tr, .cc-item, .court-card, ' +
-            '.reward-card, .review-card, .openmatch-card, .va-card, .event-card, .admin-event-card'
-        );
-
-        items.forEach(function (item) {
-            const text = normalize(item.innerText);
-            const matchText = !q || text.includes(q);
-            const matchJenis = !jenis ||
-                normalize(item.dataset.jenis).includes(jenis) ||
-                text.includes(jenis);
-            const matchStatus = !status ||
-                normalize(item.dataset.status).includes(status) ||
-                text.includes(status);
-
-            item.style.display = (matchText && matchJenis && matchStatus) ? '' : 'none';
-        });
-    }
-
-    if (searchClear && searchInput) {
-        searchClear.addEventListener('click', function () {
-            searchInput.value = '';
-            applyFilter();
-            searchInput.focus();
-        });
-    }
-
-    localInputs.forEach(function (input) {
-        input.addEventListener('input', applyFilter);
-        input.addEventListener('change', applyFilter);
-    });
-
-    document.querySelectorAll('[data-local-filter-select]').forEach(function (input) {
-        input.addEventListener('change', applyFilter);
-    });
-
-    if (searchForm) {
-        searchForm.addEventListener('submit', function (event) {
-            const hasLocalItems = document.querySelectorAll(
-                '[data-search-item], .data-table tbody tr:not([id^="extension-"]), .marketplace-table tbody tr, .cc-item, .court-card, .reward-card, .review-card, .openmatch-card'
-            ).length > 0;
-
-            if (hasLocalItems) {
-                event.preventDefault();
-                applyFilter();
-            }
-        });
-    }
-
-    applyFilter();
+    // Search feature removed by request.
 
     // Realtime Notifications Polling (setiap 6 detik)
     let currentNotifCount = {{ (int) $totalNotificationCount }};
@@ -502,24 +441,31 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.notifications.length === 0) {
                     notifPanelList.innerHTML = '<div class="notification-empty">Belum ada notifikasi baru.</div>';
                 } else {
+                    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
                     let html = '';
                     data.notifications.forEach(function (n) {
-                        const icon = n.icon || 'fa-solid fa-bell';
-                        const label = n.label || 'Notifikasi';
-                        const meta = n.meta || '';
-                        const time = n.time || '';
-                        const url = n.url || '#';
-
-                        html += '<a href="' + url + '" class="notification-item anim-click">' +
-                            '<div class="notification-icon"><i class="' + icon + '"></i></div>' +
-                            '<div class="notification-copy">' +
-                                '<strong>' + label + '</strong>' +
-                                '<span>' + meta + '</span>' +
-                            '</div>' +
-                            '<small>' + time + '</small>' +
-                        '</a>';
+                        const icon = esc(n.icon || 'fa-solid fa-bell');
+                        const label = esc(n.label || 'Notifikasi');
+                        const meta = esc(n.meta || '');
+                        const time = esc(n.time || '');
+                        const url = esc(n.url || '#');
+                        if (n.type === 'system' && n.id) {
+                            const readUrl = '{{ url('/admin/notifikasi') }}/' + encodeURIComponent(n.id) + '/read';
+                            html += '<form method="POST" action="' + readUrl + '" style="margin:0;">' +
+                                '<input type="hidden" name="_token" value="' + esc(csrf) + '">' +
+                                '<button type="submit" class="notification-item anim-click" style="width:100%;text-align:left;background:none;border:none;cursor:pointer;font:inherit;">' +
+                                '<div class="notification-icon"><i class="' + icon + '"></i></div>' +
+                                '<div class="notification-copy"><strong>' + label + '</strong><span>' + meta + '</span></div>' +
+                                '<small>' + time + '</small></button></form>';
+                        } else {
+                            html += '<a href="' + url + '" class="notification-item anim-click">' +
+                                '<div class="notification-icon"><i class="' + icon + '"></i></div>' +
+                                '<div class="notification-copy"><strong>' + label + '</strong><span>' + meta + '</span></div>' +
+                                '<small>' + time + '</small></a>';
+                        }
                     });
-                    notifPanelList.innerHTML = html;
+                    notifPanelList.innerHTML = html || '<div class="notification-empty">Belum ada notifikasi baru.</div>';
                 }
             }
 

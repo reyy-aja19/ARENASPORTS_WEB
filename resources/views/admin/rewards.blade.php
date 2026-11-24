@@ -33,7 +33,29 @@
         <thead><tr><th>No</th><th>Tanggal</th><th>User</th><th>Hadiah</th><th>Kode QR</th><th>Status</th></tr></thead>
         <tbody>
             @foreach($redemptions as $i => $item)
-            <tr><td>{{ $i + 1 }}</td><td>{{ optional($item->redeemed_at)->format('d M Y H:i') }}</td><td>{{ $item->user?->name }}</td><td>{{ $item->reward?->title }}</td><td>{{ $item->qr_code }}</td><td>{{ $item->status }}</td></tr>
+            <tr>
+                <td>{{ $i + 1 }}</td>
+                <td>{{ optional($item->redeemed_at)->format('d M Y H:i') }}</td>
+                <td>{{ $item->user?->name }}</td>
+                <td>{{ $item->reward?->title }}</td>
+                <td>
+                    @if($item->qr_code)
+                        @php
+                            $qrText = "ArenaSports Penukaran Reward\n"
+                                . "Hadiah: " . ($item->reward?->title ?? 'Reward') . "\n"
+                                . "Kode: " . ($item->qr_code ?? '-') . "\n"
+                                . "User: " . ($item->user?->name ?? '-');
+                        @endphp
+                        <div style="background:#fff;padding:6px;border:1px solid #e5e7eb;border-radius:8px;display:inline-block;margin-bottom:4px">
+                            <img loading="lazy" width="96" height="96" style="display:block;width:96px;height:96px;image-rendering:pixelated" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=10&ecc=M&data={{ urlencode($qrText) }}" alt="QR {{ $item->qr_code }}">
+                        </div>
+                        <div style="font-size:11px;color:#475569;word-break:break-all">{{ $item->qr_code }}</div>
+                    @else
+                        -
+                    @endif
+                </td>
+                <td>{{ $item->status }}</td>
+            </tr>
             @endforeach
         </tbody>
     </table>

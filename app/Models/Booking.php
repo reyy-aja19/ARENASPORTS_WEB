@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 class Booking extends Model
 {
@@ -60,5 +61,39 @@ class Booking extends Model
     public function extensions()
     {
         return $this->hasMany(BookingExtension::class);
+    }
+
+    /**
+     * Status efektif: booking yang sudah lewat jam selesai dianggap Selesai
+     * tanpa mengubah data aslinya.
+     */
+    public function getEffectiveStatusAttribute(): string
+    {
+        $status = (string) ($this->status ?? 'Menunggu');
+
+        if (in_array($status, ['Dibatalkan', 'Selesai'], true)) {
+            return $status;
+        }
+
+        if ($this->booking_date) {
+            $end = Carbon::parse(
+                $this->booking_date->toDateString().' '.substr((string) $this->end_time, 0, 5)
+            );
+
+            if ($end->isPast()) {
+                return 'Selesai';
+            }
+        }
+
+        return $status;
+    }
+
+    public function getIsPaidAttribute(): bool
+    {
+        $paymentStatus = strtolower((string) ($this->payment?->status ?? ''));
+        $bookingStatus = strtolower((string) ($this->status ?? ''));
+
+        return in_array($paymentStatus, ['lunas', 'settlement', 'capture', 'success', 'selesai'], true)
+            || in_array($bookingStatus, ['lunas', 'selesai'], true);
     }
 }

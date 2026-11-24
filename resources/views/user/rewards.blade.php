@@ -2,7 +2,15 @@
 @section('content')<section class="u-hero" style="padding:28px 32px"><div><div class="u-kicker">ARENA REWARDS</div><h1 style="font-size:30px">Poin kamu, hadiahmu.</h1><p>Tukarkan poin yang terkumpul dengan voucher promo atau potongan harga sewa.</p></div><div style="position:relative;z-index:1;text-align:center"><div style="font-size:36px;font-weight:800">{{ number_format($user->points) }}</div><div class="u-kicker">POIN TERSEDIA</div></div></section><section class="u-section"><div class="u-section-head"><div><h2>Hadiah tersedia</h2><p>Poin hanya berlaku di dalam aplikasi dan tidak dapat diuangkan.</p></div></div><div class="u-cards">@forelse($rewards as $reward)<article class="u-card"><div class="u-card-img">@if($reward->image && file_exists(public_path($reward->image)))<img src="{{ asset($reward->image) }}" alt="{{ $reward->title }}">@else<i class="fa-solid fa-gift"></i>@endif</div><div class="u-card-body"><span class="u-tag gold"><i class="fa-solid fa-coins"></i> {{ number_format($reward->points_required) }} poin</span><h3 style="margin-top:12px">{{ $reward->title }}</h3><p class="u-meta">{{ $reward->description }}</p><form method="POST" action="{{ route('user.rewards.redeem',$reward) }}" onsubmit="return confirm('Tukar {{ number_format($reward->points_required) }} poin untuk hadiah ini?')">@csrf<button class="u-btn" {{ $user->points < $reward->points_required?'disabled':'' }}>Tukar hadiah</button></form>@if($user->points < $reward->points_required)<div class="u-meta" style="margin-top:8px">Poin belum mencukupi.</div>@endif</div></article>@empty<div class="u-panel u-empty"><strong>Belum ada hadiah aktif</strong>Silakan cek kembali nanti.</div>@endforelse</div></section><section class="u-section"><div class="u-section-head"><div><h2>Riwayat penukaran</h2><p>Hadiah yang pernah kamu tukarkan.</p></div></div><div class="u-panel u-table-wrap"><table class="u-table"><thead><tr><th>Hadiah</th><th>Tanggal</th><th>Kode penukaran</th><th>Status</th></tr></thead><tbody>@forelse($redemptions as $item)<tr><td>{{ $item->reward?->title ?? 'Reward' }}</td><td>{{ $item->redeemed_at?->format('d M Y H:i') ?? '-' }}</td><td>
   <strong>{{ $item->qr_code ?? '-' }}</strong>
   @if($item->qr_code)
-    <div style="margin-top:8px"><img loading="lazy" width="110" height="110" alt="QR penukaran {{ $item->qr_code }}" src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data={{ urlencode($item->qr_code) }}"></div>
-    <small style="display:block;color:#687385">Tunjukkan QR ini di kasir</small>
+    <div style="margin-top:10px;display:inline-block;padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:12px">
+      @php
+        $qrText = "ArenaSports Penukaran Reward\n"
+            . "Hadiah: " . ($item->reward?->title ?? 'Reward') . "\n"
+            . "Kode: " . ($item->qr_code ?? '-') . "\n"
+            . "Status: " . ($item->status ?? '-');
+      @endphp
+      <img loading="lazy" width="180" height="180" style="display:block;width:180px;height:180px;max-width:100%;image-rendering:pixelated" alt="QR penukaran {{ $item->qr_code }}" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&ecc=M&data={{ urlencode($qrText) }}">
+    </div>
+    <small style="display:block;color:#687385;margin-top:6px">Tunjukkan QR ini ke kasir untuk discan</small>
   @endif
 </td><td><span class="u-tag">{{ $item->status }}</span></td></tr>@empty<tr><td colspan="4" class="u-meta">Belum ada penukaran.</td></tr>@endforelse</tbody></table></div></section>@endsection

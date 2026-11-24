@@ -13,6 +13,7 @@ use App\Models\Review;
 use App\Models\Reward;
 use App\Models\User;
 use App\Models\Event;
+use App\Models\EventRegistration;
 use App\Models\Venue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -382,7 +383,7 @@ public function courts(Request $request): View
                 'Booking lapangan ' . ($lapangan->nama ?? '') .
                     ' untuk ' . $data['booking_date'] .
                     ' berhasil dibuat dan menunggu pembayaran/konfirmasi.',
-                route('user.payments', [], false)
+                route('user.bookings', [], false)
             ));
 
             $venueOwner = $lapangan->venue?->owner
@@ -403,7 +404,7 @@ public function courts(Request $request): View
 
         if ($data['payment_method'] === 'Cash') {
             return redirect()
-                ->route('user.payments')
+                ->route('user.bookings')
                 ->with(
                     'success',
                     'Booking berhasil dibuat. Pembayaran tunai dilakukan di venue dan harus dikonfirmasi oleh Admin Venue.'
@@ -422,29 +423,153 @@ public function courts(Request $request): View
     {
         $user = $this->currentUser($request);
 
-        $bookings = Booking::with([
-            'lapangan',
+        $allBookings = Booking::with([
+            'lapangan.venue',
             'payment',
             'user',
             'extensions.payment',
+            'openMatch',
         ])
             ->where('user_id', $user->id)
-            ->where(function ($query) {
-                $query->whereIn('status', ['Lunas', 'Selesai'])
-                    ->orWhereHas('payment', function ($paymentQuery) {
-                        $paymentQuery->whereIn(DB::raw('LOWER(status)'), [
-                            'lunas',
-                            'selesai',
-                            'settlement',
-                            'capture',
-                            'success',
-                        ]);
-                    });
-            })
             ->latest()
             ->get();
 
-        return view('user.bookings', compact('user', 'bookings'));
+        $categoryOf = function (Booking $booking): string {
+            $effective = strtolower($booking->effective_status);
+            $paymentStatus = strtolower((string) ($booking->payment?->status ?? ''));
+
+            if (in_array($effective, ['dibatalkan', 'batal', 'gagal', 'expired'], true)
+                || in_array($paymentStatus, ['gagal', 'failed', 'deny', 'cancel', 'expire', 'expired'], true)) {
+                return 'dibatalkan';
+            }
+
+            if ($effective === 'selesai') {
+                return 'selesai';
+            }
+
+            if ($booking->is_paid) {
+                return 'lunas';
+            }
+
+            return 'menunggu';
+        };
+
+        $counts = [
+            'total' => $allBookings->count(),
+            'menunggu' => $allBookings->filter(fn (Booking $b) => $categoryOf($b) === 'menunggu')->count(),
+            'lunas' => $allBookings->filter(fn (Booking $b) => $categoryOf($b) === 'lunas')->count(),
+            'selesai' => $allBookings->filter(fn (Booking $b) => $categoryOf($b) === 'selesai')->count(),
+            'dibatalkan' => $allBookings->filter(fn (Booking $b) => $categoryOf($b) === 'dibatalkan')->count(),
+        ];
+
+        $filter = (string) $request->query('status', 'semua');
+
+        foreach ($allBookings as $item) {
+            $item->setAttribute('booking_category', $categoryOf($item));
+        }
+
+        $bookings = in_array($filter, ['menunggu', 'lunas', 'selesai', 'dibatalkan'], true)
+            ? $allBookings->filter(fn (Booking $b) => $b->getAttribute('booking_category') === $filter)->values()
+            : $allBookings;
+
+        return view('user.bookings', compact('user', 'bookings', 'counts', 'filter'));
+    }
+
+    /**
+     * Membatalkan booking yang belum dibayar.
+     */
+    public function bookingCancel(Request $request, Booking $booking): RedirectResponse
+    {
+        $user = $this->currentUser($request);
+
+        abort_unless((int) $booking->user_id === (int) $user->id, 403);
+
+        $booking->load(['payment', 'openMatch', 'lapangan']);
+
+        if (! in_array($booking->effective_status, ['Menunggu', 'DP'], true) || $booking->is_paid) {
+            return back()->with('error', 'Booking ini tidak bisa dibatalkan karena sudah lunas atau sudah selesai.');
+        }
+
+        // Pastikan Midtrans belum mencatat pembayaran sukses sebelum booking dibatalkan.
+        if ($this->midtransSaysPaid($booking->payment)) {
+            return back()->with('error', 'Pembayaran booking ini sudah lunas. Muat ulang halaman untuk melihat status terbaru.');
+        }
+
+        DB::transaction(function () use ($booking, $user): void {
+            $locked = Booking::whereKey($booking->id)->lockForUpdate()->firstOrFail();
+
+            $alreadyPaid = Payment::where('booking_id', $locked->id)
+                ->whereNull('booking_extension_id')
+                ->whereIn(DB::raw('LOWER(status)'), ['lunas', 'selesai', 'settlement', 'capture', 'success'])
+                ->exists();
+
+            if ($alreadyPaid || ! in_array($locked->effective_status, ['Menunggu', 'DP'], true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'booking' => 'Booking sudah berubah status dan tidak dapat dibatalkan.',
+                ]);
+            }
+
+            $locked->status = 'Dibatalkan';
+            $locked->save();
+
+            Payment::where('booking_id', $locked->id)
+                ->whereNull('booking_extension_id')
+                ->update(['status' => 'Gagal']);
+
+            OpenMatch::where('booking_id', $locked->id)
+                ->whereIn('status', ['Open', 'Penuh'])
+                ->update(['status' => 'Dibatalkan']);
+
+            $user->notify(new ArenaUserNotification(
+                'Booking Dibatalkan',
+                'Booking lapangan ' . ($locked->lapangan?->nama ?? '') .
+                    ' pada ' . optional($locked->booking_date)->format('d M Y') .
+                    ' berhasil dibatalkan.',
+                route('user.bookings', [], false)
+            ));
+        });
+
+        return redirect()
+            ->route('user.bookings')
+            ->with('success', 'Booking berhasil dibatalkan.');
+    }
+
+    private function midtransSaysPaid(?Payment $payment): bool
+    {
+        if (! $payment || strtolower((string) $payment->method) !== 'midtrans') {
+            return false;
+        }
+
+        $orderId = (string) ($payment->midtrans_order_id ?: $payment->transaction_id);
+        $serverKey = (string) config('services.midtrans.server_key');
+
+        if ($orderId === '' || $serverKey === '') {
+            return false;
+        }
+
+        \Midtrans\Config::$serverKey = $serverKey;
+        \Midtrans\Config::$isProduction = (bool) config('services.midtrans.is_production');
+        \Midtrans\Config::$isSanitized = true;
+        \Midtrans\Config::$is3ds = true;
+
+        foreach (array_unique(array_filter([$payment->midtrans_order_id, $payment->transaction_id, $orderId])) as $candidate) {
+            try {
+                $status = \Midtrans\Transaction::status((string) $candidate);
+                $transactionStatus = strtolower((string) ($status->transaction_status ?? ''));
+                $fraudStatus = strtolower((string) ($status->fraud_status ?? ''));
+
+                if ($transactionStatus === 'settlement'
+                    || ($transactionStatus === 'capture' && in_array($fraudStatus, ['', 'accept'], true))) {
+                    return true;
+                }
+
+                return false;
+            } catch (\Throwable $e) {
+                // Coba kandidat order ID berikutnya (kasus DANA memakai transaction_id).
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -699,20 +824,32 @@ public function courts(Request $request): View
     {
         $user = $this->optionalUser($request);
 
-        $matches = OpenMatch::with('booking.lapangan')
+        $matches = OpenMatch::with(['booking.lapangan.venue', 'booking.user'])
             ->whereIn('status', ['Open', 'Penuh'])
             ->whereDate('tanggal', '>=', today())
             ->orderBy('tanggal')
-            ->get();
+            ->orderBy('start_time')
+            ->get()
+            ->filter(fn (OpenMatch $match) => ! $match->has_ended)
+            ->values();
 
-        $events = Event::with(['creator.venue', 'creator.venues'])
+        $events = Event::with(['creator.venue', 'creator.venues', 'venue'])
             ->where('status', 'Publikasi')
             ->whereDate('tanggal', '>=', today()->toDateString())
             ->orderBy('tanggal', 'asc')
             ->get();
 
+        $eventRegistrations = $user
+            ? EventRegistration::with('event')
+                ->where('user_id', $user->id)
+                ->whereIn('event_id', $events->pluck('id'))
+                ->latest()
+                ->get()
+                ->keyBy('event_id')
+            : collect();
+
         $eligibleBookings = $user
-            ? Booking::with('lapangan')
+            ? Booking::with('lapangan.venue')
                 ->where('user_id', $user->id)
                 ->whereIn('status', ['DP', 'Lunas'])
                 ->whereDate('booking_date', '>=', today())
@@ -725,8 +862,17 @@ public function courts(Request $request): View
             'user',
             'matches',
             'events',
+            'eventRegistrations',
             'eligibleBookings'
         ));
+    }
+
+    /**
+     * Halaman form open match diarahkan ke daftar open match (form ada di sana).
+     */
+    public function createOpenMatch(): RedirectResponse
+    {
+        return redirect()->route('user.openmatches', ['form' => 1]);
     }
 
     private function ensureOpenMatchChatAccess(
@@ -878,10 +1024,15 @@ public function courts(Request $request): View
             'booking_id' => ['required', 'exists:bookings,id'],
             'title' => ['required', 'string', 'max:255'],
             'jumlah_pemain' => ['required', 'integer', 'min:2', 'max:99'],
+            'biaya_mode' => ['required', 'in:Gratis,Patungan'],
+            'biaya_per_pemain' => ['nullable', 'integer', 'min:0', 'max:10000000', 'required_if:biaya_mode,Patungan'],
+            'level' => ['nullable', 'string', 'max:50'],
+            'contact_phone' => ['nullable', 'string', 'max:30'],
             'deskripsi' => ['nullable', 'string', 'max:1500'],
         ]);
 
-        $booking = Booking::where('id', $data['booking_id'])
+        $booking = Booking::with(['lapangan.venue'])
+            ->where('id', $data['booking_id'])
             ->where('user_id', $user->id)
             ->whereIn('status', ['DP', 'Lunas'])
             ->whereDate('booking_date', '>=', today())
@@ -896,7 +1047,7 @@ public function courts(Request $request): View
         ) {
             return back()->withErrors([
                 'booking_id' => 'Open Match hanya dapat dibuat dari booking aktif milik sendiri sebelum jam bermain dimulai.',
-            ]);
+            ])->withInput();
         }
 
         $existingMatch = OpenMatch::where(
@@ -909,7 +1060,15 @@ public function courts(Request $request): View
         if ($existingMatch) {
             return back()->withErrors([
                 'booking_id' => 'Booking ini sudah memiliki Open Match.',
-            ]);
+            ])->withInput();
+        }
+
+        $biayaPerPemain = $data['biaya_mode'] === 'Patungan'
+            ? (int) ($data['biaya_per_pemain'] ?? 0)
+            : null;
+
+        if ($data['biaya_mode'] === 'Patungan' && $biayaPerPemain <= 0) {
+            $biayaPerPemain = (int) ceil(((int) $booking->total_price) / max(1, (int) $data['jumlah_pemain']));
         }
 
         $match = OpenMatch::create([
@@ -922,6 +1081,9 @@ public function courts(Request $request): View
             'jumlah_pemain' => $data['jumlah_pemain'],
             'jumlah_bergabung' => 1,
             'deskripsi' => $data['deskripsi'] ?? null,
+            'biaya_per_pemain' => $biayaPerPemain,
+            'level' => $data['level'] ?? null,
+            'contact_phone' => $data['contact_phone'] ?: $user->phone,
             'status' => 'Open',
         ]);
 
@@ -1036,8 +1198,93 @@ public function courts(Request $request): View
         );
     }
 
-    public function rewards(Request $request): View
+    /**
+     * Pendaftaran tim untuk event/turnamen resmi (alur hybrid: simpan data,
+     * lalu arahkan ke WhatsApp penyelenggara untuk teknis & pembayaran).
+     */
+    public function eventRegister(Request $request, Event $event): RedirectResponse
     {
+        $user = $this->currentUser($request);
+
+        $data = $request->validate([
+            'team_name' => ['required', 'string', 'max:150'],
+            'captain_name' => ['required', 'string', 'max:150'],
+            'captain_phone' => ['required', 'string', 'max:30'],
+            'member_count' => ['required', 'integer', 'min:1', 'max:1000'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'agree' => ['accepted'],
+        ]);
+
+        abort_unless($event->status === 'Publikasi', 404);
+
+        $event->load(['venue', 'creator.venue', 'creator.venues']);
+
+        if ($event->tanggal && $event->tanggal->lt(today())) {
+            return back()->withErrors(['event' => 'Event ini sudah berlalu.'])->withInput();
+        }
+
+        if ($event->registration_deadline && $event->registration_deadline->lt(today())) {
+            return back()->withErrors(['event' => 'Pendaftaran event ini sudah ditutup.'])->withInput();
+        }
+
+        if ((int) $event->kuota > 0
+            && $event->registrations()->count() >= (int) $event->kuota) {
+            return back()->withErrors(['event' => 'Kuota tim untuk event ini sudah penuh.'])->withInput();
+        }
+
+        $alreadyRegistered = EventRegistration::where('event_id', $event->id)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if ($alreadyRegistered) {
+            return back()->withErrors(['event' => 'Kamu sudah mendaftarkan tim untuk event ini. Hubungi penyelenggara untuk perubahan data.']);
+        }
+
+        $registration = EventRegistration::create([
+            'event_id' => $event->id,
+            'user_id' => $user->id,
+            'team_name' => $data['team_name'],
+            'captain_name' => $data['captain_name'],
+            'captain_phone' => $data['captain_phone'],
+            'member_count' => $data['member_count'],
+            'notes' => $data['notes'] ?? null,
+            'status' => 'Baru',
+        ]);
+
+        $organizerName = $event->creator?->name ?? 'Penyelenggara';
+        $phone = $event->whatsapp_number;
+
+        $message = "Halo {$organizerName}, saya {$registration->captain_name} dari tim "
+            ."{$registration->team_name}. Saya ingin mendaftar event \"{$event->title}\" "
+            ."({$event->jenis}) pada ".optional($event->tanggal)->format('d M Y').'. '
+            ."Jumlah anggota: {$registration->member_count} orang. "
+            .($registration->notes ? "Catatan: {$registration->notes}. " : '')
+            .'Mohon informasi teknis, kelengkapan, dan pembayaran selanjutnya. Terima kasih.';
+
+        $waUrl = $phone
+            ? 'https://wa.me/'.$phone.'?text='.urlencode($message)
+            : null;
+
+        if ($event->creator) {
+            $event->creator->notify(new ArenaUserNotification(
+                'Pendaftaran Tim Baru',
+                'Tim '.$registration->team_name.' mendaftar event '.$event->title.'.',
+                route('admin.events.registrations', $event, false)
+            ));
+        }
+
+        return back()
+            ->with('success', 'Pendaftaran tim berhasil disimpan. Lanjutkan konfirmasi ke WhatsApp penyelenggara.')
+            ->with('event_registration_success', [
+                'team_name' => $registration->team_name,
+                'captain_name' => $registration->captain_name,
+                'event_title' => $event->title,
+                'wa_url' => $waUrl,
+                'organizer' => $organizerName,
+            ]);
+    }
+
+    public function rewards(Request $request): View    {
         $user = $this->currentUser($request);
 
         $rewards = Reward::where('status', 'Aktif')

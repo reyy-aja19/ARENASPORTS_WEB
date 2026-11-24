@@ -235,6 +235,115 @@ public function register(Request $request, TurnstileService $turnstile)
         return $this->redirectAfterLogin($request);
     }
 
+    public function redirectToApple()
+    {
+        $clientId = config('services.apple.client_id');
+
+        if (! $clientId) {
+            return redirect()->route('login')->with(
+                'error',
+                'Login Apple belum dikonfigurasi. Tambahkan APPLE_CLIENT_ID/SECRET di .env.'
+            );
+        }
+
+        try {
+            return Socialite::driver('apple')
+                ->scopes(['name', 'email'])
+                ->redirect();
+        } catch (\Throwable $e) {
+            Log::warning('Apple OAuth redirect gagal: '.$e->getMessage());
+
+            return redirect()->route('login')->with(
+                'error',
+                'Login Apple belum siap. Pastikan package/provider Apple Socialite dan kredensial Apple sudah dikonfigurasi.'
+            );
+        }
+    }
+
+    public function handleAppleCallback(Request $request)
+    {
+        $clientId = config('services.apple.client_id');
+
+        if (! $clientId) {
+            return redirect()->route('login')->with(
+                'error',
+                'Login Apple belum dikonfigurasi.'
+            );
+        }
+
+        try {
+            $apple = Socialite::driver('apple')->user();
+        } catch (\Throwable $e) {
+            Log::warning('Apple OAuth gagal: '.$e->getMessage());
+
+            return redirect()->route('login')->with(
+                'error',
+                'Login Apple gagal atau dibatalkan. Periksa konfigurasi Apple dan coba lagi.'
+            );
+        }
+
+        $appleEmail = $apple->getEmail();
+        $name = $apple->getName() ?: $apple->user['name'] ?? 'Pengguna ArenaSports';
+
+        // Apple bisa mengirim nama hanya pada login pertama dalam payload "user".
+        $rawUser = $request->input('user');
+        if (is_string($rawUser)) {
+            $decoded = json_decode($rawUser, true);
+            if (is_array($decoded)) {
+                $first = data_get($decoded, 'name.firstName');
+                $last = data_get($decoded, 'name.lastName');
+                $full = trim(($first ? $first.' ' : '').($last ?? ''));
+                if ($full !== '') {
+                    $name = $full;
+                }
+            }
+        }
+
+        if (! $appleEmail || ! filter_var($appleEmail, FILTER_VALIDATE_EMAIL)) {
+            return redirect()->route('login')->with(
+                'error',
+                'Apple tidak memberikan email yang valid. Pastikan Anda mengizinkan berbagi email.'
+            );
+        }
+
+        $user = User::where('email', $appleEmail)->first();
+        $isNew = ! $user;
+
+        if (! $user) {
+            $user = User::create([
+                'name' => $name ?: 'Pengguna ArenaSports',
+                'email' => $appleEmail,
+                'password' => Hash::make(Str::random(48)),
+                'role' => 'user',
+                'status' => 'Aktif',
+                'points' => 0,
+                'email_verified_at' => now(),
+            ]);
+        } elseif (! $user->email_verified_at) {
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
+
+        if ($user->status !== 'Aktif') {
+            return redirect()->route('login')->with('error', 'Akun sedang nonaktif.');
+        }
+
+        $request->session()->regenerate();
+        $request->session()->put([
+            'admin_logged_in' => true,
+            'admin_user_id' => $user->id,
+            'admin_role' => $user->role,
+        ]);
+
+        $this->sendAccountActivity(
+            $user,
+            $isNew ? 'Pendaftaran Apple berhasil' : 'Login Apple berhasil',
+            $isNew ? 'Akun ArenaSports kamu berhasil dibuat menggunakan Apple.' : 'Akun ArenaSports kamu baru saja digunakan untuk login menggunakan Apple.',
+            'Apple'
+        );
+
+        return $this->redirectAfterLogin($request);
+    }
+
     public function showPhoneLogin()
     {
         return view('auth.phone', ['mode' => 'login']);
