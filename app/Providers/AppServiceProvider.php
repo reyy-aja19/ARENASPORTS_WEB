@@ -25,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
         // Rate limit semua permintaan API (mobile + guest).
         // Kunci: token Bearer (per perangkat), email/identifier saat login, IP sebagai fallback.
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(600)->by(
+            return Limit::perMinute(1200)->by(
                 $request->bearerToken()
                     ?: $request->input('identifier')
                     ?: $request->input('email')
