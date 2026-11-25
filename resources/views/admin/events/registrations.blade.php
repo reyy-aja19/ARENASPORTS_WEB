@@ -68,9 +68,9 @@
             <thead>
                 <tr>
                     <th>No</th>
-                    <th>Tim</th>
-                    <th>Ketua & Kontak</th>
-                    <th>Anggota</th>
+                    <th>Peserta / Tim</th>
+                    <th>Kontak</th>
+                    <th>Jenis / Anggota</th>
                     <th>Catatan</th>
                     <th>Status</th>
                     <th>Aksi</th>
@@ -81,7 +81,7 @@
                     <tr>
                         <td>{{ $i + 1 }}</td>
                         <td>
-                            <strong>{{ $registration->team_name }}</strong>
+                            <strong>{{ $registration->display_name }}</strong>
                             <br><small style="color:#718078;">Daftar {{ $registration->created_at?->format('d M Y, H:i') }}</small>
                         </td>
                         <td>
@@ -91,7 +91,10 @@
                                 <br><small style="color:#94a3b8;">Akun: {{ $registration->user->name }}</small>
                             @endif
                         </td>
-                        <td>{{ $registration->member_count }} orang</td>
+                        <td>
+                            <span style="font-size:12px;font-weight:700;color:#526b5c">{{ $registration->registration_type ?: $event->registration_type_label }}</span>
+                            <br><small style="color:#64748b;">{{ $registration->member_count }} {{ $registration->is_individual ? 'peserta' : 'anggota' }}</small>
+                        </td>
                         <td style="max-width:220px;">{{ $registration->notes ?: '—' }}</td>
                         <td>
                             <span style="display:inline-block;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:800;{{ $statusStyles[$registration->status] ?? 'background:#edf1f5;color:#536273' }}">

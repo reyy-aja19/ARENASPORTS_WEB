@@ -1,12 +1,12 @@
 
 <!doctype html>
-<html lang="id">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="theme-color" content="#073e2b">
 
-    <title>Masuk · ARENASPORTS</title>
+    <title>{{ __('Masuk') }} · ARENASPORTS</title>
 
     <link rel="stylesheet" href="{{ asset('user-ui.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -49,29 +49,28 @@
             </span>
 
             <h1>
-                Temukan lapangan.<br>
-                <em>Bangun momen.</em>
+                {{ __('Temukan lapangan.') }}<br>
+                <em>{{ __('Bangun momen.') }}</em>
             </h1>
 
             <p>
-                Satu tempat untuk mencari venue, mengatur jadwal bermain,
-                menemukan teman satu tim, dan menikmati setiap pertandingan.
+                {{ __('Lanjutkan perjalanan olahraga bersama ArenaSports.') }}
             </p>
 
             <div class="u-auth-benefits">
                 <span>
                     <i class="fa-solid fa-location-dot"></i>
-                    Venue pilihan
+                    {{ __('Venue pilihan') }}
                 </span>
 
                 <span>
                     <i class="fa-solid fa-calendar-check"></i>
-                    Booking mudah
+                    {{ __('Booking mudah') }}
                 </span>
 
                 <span>
                     <i class="fa-solid fa-trophy"></i>
-                    Poin &amp; reward
+                    {{ __('Poin & reward') }}
                 </span>
             </div>
 
@@ -92,13 +91,13 @@
             </div>
 
             <span class="u-form-kicker">
-                SELAMAT DATANG KEMBALI
+                {{ __('Selamat datang kembali') }}
             </span>
 
-            <h2>Masuk ke akunmu</h2>
+            <h2>{{ __('Masuk ke akunmu') }}</h2>
 
             <p class="u-login-subtitle">
-                Lanjutkan perjalanan olahraga bersama ArenaSports.
+                {{ __('Lanjutkan perjalanan olahraga bersama ArenaSports.') }}
             </p>
 
             {{-- Pesan error dan success --}}
@@ -136,7 +135,7 @@
 
                 {{-- Email --}}
                 <div class="u-field">
-                    <label for="email">Alamat email</label>
+                    <label for="email">{{ __('Alamat email') }}</label>
 
                     <div class="u-input-icon">
                         <i class="fa-regular fa-envelope"></i>
@@ -155,7 +154,7 @@
 
                 {{-- Password --}}
 <div class="u-field">
-    <label for="password">Password</label>
+    <label for="password">{{ __('Password') }}</label>
 
     <div class="u-input-icon">
         <i class="fa-solid fa-lock"></i>
@@ -164,7 +163,7 @@
             id="password"
             type="password"
             name="password"
-            placeholder="Masukkan password"
+            placeholder="{{ __('Masukkan password') }}"
             required
             autocomplete="current-password">
 
@@ -180,7 +179,7 @@
     <div style="display:flex; justify-content:flex-end; margin-top:10px;">
         <a href="{{ route('password.request') }}"
            style="font-size:14px; color:#073e2b; font-weight:600; text-decoration:none;">
-            Lupa Password?
+            {{ __('Lupa Password?') }}
         </a>
     </div>
 </div>
@@ -196,42 +195,42 @@
 
                 {{-- Tombol Login --}}
                 <button class="u-btn u-login-submit" type="submit">
-                    Masuk ke ArenaSports
+                    {{ __('Masuk ke ArenaSports') }}
                     <i class="fa-solid fa-arrow-right"></i>
                 </button>
 
             </form>
 
             <div class="u-login-divider">
-                <span>atau lanjutkan dengan</span>
+                <span>{{ __('atau lanjutkan dengan') }}</span>
             </div>
 
             {{-- Login WhatsApp --}}
             <a class="u-google-login" href="{{ route('phone.login') }}">
                 <i class="fa-brands fa-whatsapp"></i>
-                Masuk dengan nomor WhatsApp
+                {{ __('Masuk dengan nomor WhatsApp') }}
             </a>
 
             {{-- Login Google --}}
             <a class="u-google-login" href="{{ route('auth.google.redirect') }}">
                 <i class="fa-brands fa-google"></i>
-                Masuk dengan Google
+                {{ __('Masuk dengan Google') }}
             </a>
 
             {{-- Login Apple --}}
             <a class="u-google-login" href="{{ route('auth.apple.redirect') }}">
                 <i class="fa-brands fa-apple"></i>
-                Lanjutkan dengan Apple
+                {{ __('Lanjutkan dengan Apple') }}
             </a>
 
             <p class="u-register-prompt">
-                Belum punya akun?
-                <a href="{{ route('register') }}">Daftar gratis</a>
+                {{ __('Belum punya akun?') }}
+                <a href="{{ route('register') }}">{{ __('Daftar gratis') }}</a>
             </p>
 
             <div class="u-login-security">
                 <i class="fa-solid fa-shield-halved"></i>
-                Akun dan informasi kamu dilindungi.
+                {{ __('Akun dan informasi kamu dilindungi.') }}
             </div>
 
         </div>

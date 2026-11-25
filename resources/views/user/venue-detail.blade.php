@@ -42,19 +42,19 @@
 </style>
 
 @php
-    $companyTitle = $venue->company_name ?: $venue->name;
+    $venueTitle = $venue->name ?: ($venue->company_name ?: 'Venue ArenaSports');
     $availableCount = $courts->where('status', 'Tersedia')->count();
 @endphp
 
 <div class="vd-page">
     <section class="vd-hero">
         <div>
-            <span class="vd-eyebrow"><i class="fa-solid fa-building"></i> Profil perusahaan / venue</span>
-            <h1>{{ $companyTitle }}</h1>
-            @if($venue->name && $venue->name !== $companyTitle)
-                <p><i class="fa-solid fa-location-crosshairs"></i> Cabang / lokasi: {{ $venue->name }}</p>
+            <span class="vd-eyebrow"><i class="fa-solid fa-building"></i> {{ __('Profil venue') }}</span>
+            <h1>{{ $venueTitle }}</h1>
+            @if($venue->company_name && $venue->company_name !== $venueTitle)
+                <p><i class="fa-solid fa-briefcase"></i> Pengelola: {{ $venue->company_name }}</p>
             @endif
-            <p style="margin-top:8px">{{ $venue->description ?: $venue->company_description ?: 'Temukan lapangan olahraga yang tersedia di lokasi ini.' }}</p>
+            <p style="margin-top:8px">{{ $venue->description ?: 'Temukan lapangan olahraga yang tersedia di venue ini.' }}</p>
             <div class="vd-facts">
                 <span class="vd-fact"><i class="fa-solid fa-futbol"></i> {{ implode(', ', $venue->sports ?? []) ?: 'Olahraga belum ditentukan' }}</span>
                 <span class="vd-fact"><i class="fa-solid fa-layer-group"></i> {{ $courts->count() }} lapangan</span>
@@ -62,7 +62,7 @@
             </div>
         </div>
         @if($venue->photo)
-            <img class="vd-cover" src="{{ $venue->photo_url ?? asset($venue->photo) }}" alt="Foto {{ $companyTitle }}">
+            <img class="vd-cover" src="{{ $venue->photo_url ?? asset($venue->photo) }}" alt="Foto {{ $venueTitle }}">
         @else
             <div class="vd-cover" style="display:grid;place-items:center;background:#ffffff18;color:#dff9e6;font-size:70px"><i class="fa-solid fa-building"></i></div>
         @endif
@@ -70,33 +70,33 @@
 
     <div class="vd-section-head">
         <div>
-            <h2>Informasi Venue</h2>
-            <p>Informasi perusahaan, alamat, dan fasilitas lokasi.</p>
+            <h2>{{ __('Informasi Venue') }}</h2>
+            <p>{{ __('Informasi perusahaan, alamat, dan fasilitas lokasi.') }}</p>
         </div>
-        <a class="vd-back" href="{{ route('user.venues') }}"><i class="fa-solid fa-arrow-left"></i> Kembali ke daftar venue</a>
+        <a class="vd-back" href="{{ route('user.venues') }}"><i class="fa-solid fa-arrow-left"></i> {{ __('Kembali ke daftar venue') }}</a>
     </div>
 
     <div class="vd-info-grid">
-        <div class="vd-info"><i class="fa-solid fa-location-dot"></i><strong>Alamat</strong><span>{{ $venue->address ?: 'Belum diisi' }}</span></div>
-        <div class="vd-info"><i class="fa-solid fa-phone"></i><strong>Kontak</strong><span>{{ $venue->contact_phone ?: $venue->company_phone ?: 'Belum diisi' }}</span></div>
-        <div class="vd-info"><i class="fa-regular fa-clock"></i><strong>Jam operasional</strong><span>{{ $venue->operating_hours ?: 'Belum diinformasikan' }}</span></div>
-        <div class="vd-info"><i class="fa-solid fa-map"></i><strong>Lokasi peta</strong><span>@if($venue->google_maps_url)<a href="{{ $venue->google_maps_url }}" target="_blank" rel="noopener noreferrer" style="color:#087747;font-weight:750">Buka Google Maps</a>@else Belum tersedia @endif</span></div>
-        <div class="vd-info"><i class="fa-solid fa-building"></i><strong>Nama perusahaan</strong><span>{{ $venue->company_name ?: $venue->name }}</span></div>
-        <div class="vd-info"><i class="fa-solid fa-list-check"></i><strong>Fasilitas</strong><span>{{ implode(', ', $venue->facilities ?? []) ?: 'Belum diinformasikan' }}</span></div>
+        <div class="vd-info"><i class="fa-solid fa-location-dot"></i><strong>{{ __('Alamat') }}</strong><span>{{ $venue->address ?: __('Belum diisi') }}</span></div>
+        <div class="vd-info"><i class="fa-solid fa-phone"></i><strong>{{ __('Kontak') }}</strong><span>{{ $venue->contact_phone ?: $venue->company_phone ?: __('Belum diisi') }}</span></div>
+        <div class="vd-info"><i class="fa-regular fa-clock"></i><strong>{{ __('Jam operasional') }}</strong><span>{{ $venue->operating_hours ?: __('Belum diinformasikan') }}</span></div>
+        <div class="vd-info"><i class="fa-solid fa-map"></i><strong>{{ __('Lokasi peta') }}</strong><span>@if($venue->google_maps_url)<a href="{{ $venue->google_maps_url }}" target="_blank" rel="noopener noreferrer" style="color:#087747;font-weight:750">{{ __('Buka Google Maps') }}</a>@else {{ __('Belum tersedia') }} @endif</span></div>
+        <div class="vd-info"><i class="fa-solid fa-building"></i><strong>{{ __('Nama perusahaan') }}</strong><span>{{ $venue->company_name ?: $venue->name }}</span></div>
+        <div class="vd-info"><i class="fa-solid fa-list-check"></i><strong>{{ __('Fasilitas') }}</strong><span>{{ implode(', ', $venue->facilities ?? []) ?: __('Belum diinformasikan') }}</span></div>
     </div>
 
     @if(!empty($venue->gallery))
         <div class="vd-gallery">
             @foreach($venue->gallery as $image)
-                <img src="{{ asset($image) }}" alt="Galeri {{ $companyTitle }}" loading="lazy">
+                <img src="{{ asset($image) }}" alt="Galeri {{ $venueTitle }}" loading="lazy">
             @endforeach
         </div>
     @endif
 
     <div class="vd-section-head">
         <div>
-            <h2>Daftar Lapangan</h2>
-            <p>Pilih lapangan yang ingin kamu gunakan. Status perbaikan ditampilkan agar kamu mengetahui kondisi terbaru.</p>
+            <h2>{{ __('Daftar Lapangan') }}</h2>
+            <p>{{ __('Pilih lapangan yang ingin kamu gunakan. Status perbaikan ditampilkan agar kamu mengetahui kondisi terbaru.') }}</p>
         </div>
     </div>
 
@@ -118,11 +118,11 @@
                     <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap">
                         <span class="vd-chip">{{ $court->jenis }}</span>
                         @if($court->status === 'Tersedia')
-                            <span class="vd-chip">Tersedia</span>
+                            <span class="vd-chip">{{ __('Tersedia') }}</span>
                         @elseif($isRepair)
                             <span class="vd-chip repair"><i class="fa-solid fa-screwdriver-wrench"></i> {{ $court->status }}</span>
                         @else
-                            <span class="vd-chip full">{{ $court->status ?: 'Tidak tersedia' }}</span>
+                            <span class="vd-chip full">{{ $court->status ?: __('Tidak tersedia') }}</span>
                         @endif
                     </div>
                     <h3>{{ $court->nama }}</h3>
@@ -136,12 +136,12 @@
                         <div class="vd-note">Lapangan ini sementara belum dapat dipesan.</div>
                     @else
                         <div class="vd-price">Rp {{ number_format($court->harga,0,',','.') }} <span style="font-size:11px;font-weight:600;color:#78877e">/ jam</span></div>
-                        <a class="vd-btn" href="{{ route('courts.detail', $court) }}">Pilih Lapangan <i class="fa-solid fa-arrow-right"></i></a>
+                        <a class="vd-btn" href="{{ route('courts.detail', $court) }}">{{ __('Pilih Lapangan') }} <i class="fa-solid fa-arrow-right"></i></a>
                     @endif
                 </div>
             </article>
         @empty
-            <div class="vd-empty"><i class="fa-solid fa-futbol" style="font-size:30px;color:#168b50"></i><p>Venue ini belum memiliki lapangan.</p></div>
+            <div class="vd-empty"><i class="fa-solid fa-futbol" style="font-size:30px;color:#168b50"></i><p>{{ __('Venue ini belum memiliki lapangan.') }}</p></div>
         @endforelse
     </div>
 </div>

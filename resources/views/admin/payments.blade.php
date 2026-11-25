@@ -27,20 +27,41 @@
                     </td>
                     <td>{{ $payment->method }}</td>
                     <td>Rp {{ number_format($payment->amount, 0, ',', '.') }}</td>
-                    <td>{{ $payment->status }}</td>
+                    <td>
+                        @php
+                            $paymentStatus = strtolower((string) $payment->status);
+                            $isPaid = in_array($paymentStatus, ['lunas', 'settlement', 'capture', 'success', 'paid'], true);
+                            $isPending = in_array($paymentStatus, ['menunggu', 'pending'], true);
+                        @endphp
+                        @if($isPaid)
+                            <span class="status-active">Lunas</span>
+                        @elseif($isPending)
+                            <span class="status-inactive">Menunggu</span>
+                        @else
+                            <span class="status-inactive">{{ $payment->status }}</span>
+                        @endif
+                    </td>
                     <td>
                         @if(strtolower((string) $payment->method) === 'cash' && $payment->status === 'Menunggu')
                             <form method="POST" action="{{ route('admin.payments.verify', $payment) }}"
                                   onsubmit="return confirm('Konfirmasi bahwa uang tunai sudah diterima?')">
                                 @csrf
-                                <button type="submit" class="btn-ui btn-green">
-                                    Konfirmasi Cash
-                                </button>
+                                <button type="submit" class="btn-ui btn-green">Konfirmasi Cash</button>
                             </form>
-                        @elseif(strtolower((string) $payment->method) === 'cash' && $payment->status === 'Lunas')
+                        @elseif(strtolower((string) $payment->method) === 'cash' && $isPaid)
                             <span class="status-active">Cash diterima</span>
+                        @elseif(strtolower((string) $payment->method) !== 'cash' && $isPaid)
+                            <span class="status-active">Pembayaran Midtrans terverifikasi</span>
+                        @elseif(strtolower((string) $payment->method) !== 'cash')
+                            <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-start;">
+                                <span style="font-size:12px;color:#64748b;">Status Midtrans: {{ $payment->status }}</span>
+                                <form method="POST" action="{{ route('admin.payments.sync', $payment) }}">
+                                    @csrf
+                                    <button type="submit" class="btn-ui btn-gray" style="padding:6px 12px;font-size:12px;">Cek Status Midtrans</button>
+                                </form>
+                            </div>
                         @else
-                            <span>Menunggu notifikasi resmi Midtrans</span>
+                            <span>-</span>
                         @endif
                     </td>
                 </tr>

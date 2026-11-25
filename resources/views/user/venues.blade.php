@@ -503,11 +503,10 @@
     {{-- HERO BANNER --}}
     <section class="venue-hero">
         <div class="venue-hero-content">
-            <h1>Temukan <span>Venue</span></h1>
+            <h1>{!! __('Temukan <span>Venue</span>') !!}</h1>
 
             <p>
-                Temukan tempat olahraga favoritmu, pilih venue terbaik,
-                dan lihat berbagai lapangan yang tersedia di dalamnya.
+                {{ __('Temukan tempat olahraga favoritmu, pilih venue terbaik, dan lihat berbagai lapangan yang tersedia di dalamnya.') }}
             </p>
         </div>
     </section>
@@ -517,16 +516,16 @@
         <div>
             <h2>
                 <i class="fa-solid fa-location-dot" style="color:#168653"></i>
-                Venue Pilihan
+                {{ __('Venue Pilihan') }}
             </h2>
             <p>
-                Pilih venue olahraga favoritmu, lalu lihat dan pesan lapangan yang tersedia di dalamnya.
+                {{ __('Pilih venue olahraga favoritmu, lalu lihat dan pesan lapangan yang tersedia di dalamnya.') }}
             </p>
         </div>
 
         <span class="venue-count">
             <i class="fa-solid fa-store"></i>
-            {{ $venues->count() }} Venue tersedia
+            {{ $venues->count() }} {{ __('Venue tersedia') }}
         </span>
     </div>
 
@@ -538,21 +537,21 @@
         <span style="display:flex; align-items:center; gap:8px;">
             <i class="fa-solid fa-location-crosshairs" style="color:#168653; font-size:16px;"></i>
             @if($isGpsActive)
-                <strong>Lokasi GPS aktif!</strong> Menampilkan venue terurut dari yang terdekat dengan lokasimu.
+                <strong>{{ __('Lokasi GPS aktif!') }}</strong> {{ __('Menampilkan venue terurut dari yang terdekat dengan lokasimu.') }}
             @else
-                Aktifkan GPS untuk menemukan venue olahraga yang paling dekat dengan posisimu.
+                {{ __('Aktifkan GPS untuk menemukan venue olahraga yang paling dekat dengan posisimu.') }}
             @endif
         </span>
 
         <div style="display:flex; gap:8px; align-items:center;">
             @if($isGpsActive)
                 <a href="{{ route('user.venues', array_merge(request()->except(['clear_location']), ['clear_location' => 1])) }}" class="u-btn ghost" style="padding:8px 12px; font-size:11px; text-decoration:none;">
-                    <i class="fa-solid fa-rotate-left"></i> Reset Jarak
+                    <i class="fa-solid fa-rotate-left"></i> {{ __('Reset Jarak') }}
                 </a>
             @endif
             <button class="u-btn ghost" type="button" id="venueNearbyButton" style="white-space:nowrap;">
                 <i class="fa-solid fa-location-dot"></i>
-                {{ $isGpsActive ? 'Perbarui Lokasi GPS' : 'Cari Venue Terdekat' }}
+                {{ $isGpsActive ? __('Perbarui Lokasi GPS') : __('Cari Venue Terdekat') }}
             </button>
         </div>
     </div>
@@ -563,18 +562,18 @@
             type="text"
             name="q"
             value="{{ request('q') }}"
-            placeholder="Cari nama venue, pengelola, kota, atau alamat..."
+            placeholder="{{ __('Cari nama venue, pengelola, kota, atau alamat...') }}"
         >
 
         @if(request()->filled('q'))
             <a href="{{ route('user.venues') }}" class="u-btn ghost" style="text-decoration:none; display:inline-flex; align-items:center; gap:6px;">
-                <i class="fa-solid fa-xmark"></i> Hapus Filter
+                <i class="fa-solid fa-xmark"></i> {{ __('Hapus Filter') }}
             </a>
         @endif
 
         <button class="u-btn" type="submit">
             <i class="fa-solid fa-magnifying-glass"></i>
-            Cari
+            {{ __('Cari') }}
         </button>
     </form>
 
@@ -611,7 +610,7 @@
 
                     <span class="venue-photo-badge">
                         <i class="fa-solid fa-check-circle"></i>
-                        Venue ArenaSports
+                        {{ __('Venue ArenaSports') }}
                     </span>
 
                 </div>
@@ -620,19 +619,19 @@
                 <div class="venue-card-body">
 
                     <h3 class="venue-name">
-                        {{ $venue->company_name ?: $venue->name }}
+                        {{ $venue->name ?: $venue->company_name }}
                     </h3>
                     @if($venue->company_name && $venue->name !== $venue->company_name)
                         <p style="margin:-7px 0 12px;color:#71847a;font-size:13px;">
-                            <i class="fa-solid fa-location-crosshairs"></i>
-                            {{ $venue->name }}
+                            <i class="fa-solid fa-building"></i>
+                            {{ $venue->company_name }}
                         </p>
                     @endif
 
                     <div class="venue-info">
                         <i class="fa-solid fa-location-dot"></i>
                         <span>
-                            {{ $venue->address ?: 'Alamat belum tersedia' }}
+                            {{ $venue->address ?: __('Alamat belum tersedia') }}
                         </span>
                         @if(isset($venue->distance_km) && $venue->distance_km !== null)
                             <span class="u-tag" style="background:#e8f7ec; color:#146c43; font-weight:800; border:1px solid #c3e6cb; margin-left:6px; font-size:11px;">
@@ -654,7 +653,7 @@
                     @else
                         <div class="venue-info">
                             <i class="fa-solid fa-info-circle"></i>
-                            <span>Informasi olahraga belum tersedia.</span>
+                            <span>{{ __('Informasi olahraga belum tersedia.') }}</span>
                         </div>
                     @endif
 
@@ -663,7 +662,7 @@
                         <i class="fa-solid fa-layer-group"></i>
                         <span>
                             {{ $venue->lapangans_count ?? 0 }}
-                            Lapangan di venue ini
+                            {{ __('Lapangan di venue ini') }}
                         </span>
                     </div>
 
@@ -672,7 +671,7 @@
                         class="venue-button"
                         href="{{ route('user.venues.show', $venue) }}"
                     >
-                        Lihat Venue
+                        {{ __('Lihat Venue') }}
                         <i class="fa-solid fa-arrow-right"></i>
                     </a>
 
@@ -683,10 +682,9 @@
 
             <div class="venue-empty">
                 <i class="fa-solid fa-store-slash"></i>
-                <h3>Belum Ada Venue Aktif</h3>
+                <h3>{{ __('Belum Ada Venue Aktif') }}</h3>
                 <p>
-                    Saat ini belum ada venue yang tersedia.
-                    Silakan kunjungi kembali nanti.
+                    {{ __('Saat ini belum ada venue yang tersedia. Silakan kunjungi kembali nanti.') }}
                 </p>
             </div>
 

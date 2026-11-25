@@ -131,11 +131,11 @@
     <div class="ticket-heading">
         <div>
             <span class="ticket-eyebrow">ARENASPORTS · AREA PERSONAL</span>
-            <h2>Booking Saya</h2>
-            <p>Semua booking dan status pembayaran kamu ada di sini.</p>
+            <h2>{{ __('Booking Saya') }}</h2>
+            <p>{{ __('Semua booking dan status pembayaran kamu ada di sini.') }}</p>
         </div>
         <a class="ticket-btn no-print" href="{{ route('user.venues') }}">
-            <i class="fa-solid fa-plus"></i> Booking baru
+            <i class="fa-solid fa-plus"></i> {{ __('Booking baru') }}
         </a>
     </div>
 
@@ -162,28 +162,28 @@
         <div class="ticket-summary-item">
             <span class="ticket-summary-icon"><i class="fa-regular fa-calendar-check"></i></span>
             <div>
-                <small>Total booking</small>
+                <small>{{ __('Total booking') }}</small>
                 <strong>{{ $counts['total'] }}</strong>
             </div>
         </div>
         <div class="ticket-summary-item">
             <span class="ticket-summary-icon"><i class="fa-solid fa-hourglass-half"></i></span>
             <div>
-                <small>Menunggu pembayaran</small>
+                <small>{{ __('Menunggu pembayaran') }}</small>
                 <strong>{{ $counts['menunggu'] }}</strong>
             </div>
         </div>
         <div class="ticket-summary-item">
             <span class="ticket-summary-icon"><i class="fa-solid fa-circle-check"></i></span>
             <div>
-                <small>Lunas</small>
+                <small>{{ __('Lunas') }}</small>
                 <strong>{{ $counts['lunas'] }}</strong>
             </div>
         </div>
         <div class="ticket-summary-item">
             <span class="ticket-summary-icon"><i class="fa-solid fa-flag-checkered"></i></span>
             <div>
-                <small>Selesai</small>
+                <small>{{ __('Selesai') }}</small>
                 <strong>{{ $counts['selesai'] }}</strong>
             </div>
         </div>
@@ -191,11 +191,11 @@
 
     @php
         $filters = [
-            'semua' => ['label' => 'Semua', 'count' => $counts['total']],
-            'menunggu' => ['label' => 'Menunggu', 'count' => $counts['menunggu']],
-            'lunas' => ['label' => 'Lunas', 'count' => $counts['lunas']],
-            'selesai' => ['label' => 'Selesai', 'count' => $counts['selesai']],
-            'dibatalkan' => ['label' => 'Dibatalkan', 'count' => $counts['dibatalkan']],
+            'semua' => ['label' => __('Semua'), 'count' => $counts['total']],
+            'menunggu' => ['label' => __('Menunggu'), 'count' => $counts['menunggu']],
+            'lunas' => ['label' => __('Lunas'), 'count' => $counts['lunas']],
+            'selesai' => ['label' => __('Selesai'), 'count' => $counts['selesai']],
+            'dibatalkan' => ['label' => __('Dibatalkan'), 'count' => $counts['dibatalkan']],
         ];
     @endphp
 

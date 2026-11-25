@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Channels\FcmChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -19,7 +20,7 @@ class AccountActivityNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['mail'];
+        return ['mail', 'database', FcmChannel::class];
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -31,5 +32,27 @@ class AccountActivityNotification extends Notification
             ->line('Metode: '.$this->method)
             ->line('Waktu: '.$this->time)
             ->line('Jika aktivitas ini bukan kamu, segera hubungi administrator ArenaSports.');
+    }
+
+    public function toDatabase(object $notifiable): array
+    {
+        return [
+            'title' => $this->subject,
+            'message' => $this->message,
+            'url' => '/profile',
+            'type' => 'account',
+        ];
+    }
+
+    public function toFcm(object $notifiable): array
+    {
+        return [
+            'title' => $this->subject,
+            'body' => $this->message,
+            'data' => [
+                'type' => 'account',
+                'url' => '/profile',
+            ],
+        ];
     }
 }

@@ -37,35 +37,35 @@
     <div class="pay-card">
         <div class="pay-body">
             <div class="pay-amount">
-                <small>Total yang harus dibayar</small>
+                <small>{{ __('Total yang harus dibayar') }}</small>
                 <strong>Rp {{ number_format($amount, 0, ',', '.') }}</strong>
             </div>
 
             <div class="pay-grid">
                 <div class="pay-item">
-                    <small>VENUE</small>
+                    <small>{{ __('VENUE') }}</small>
                     <strong>{{ $booking?->lapangan?->venue?->name ?? $booking?->lapangan?->nama ?? 'ArenaSports' }}</strong>
                 </div>
                 <div class="pay-item">
-                    <small>LAPANGAN</small>
+                    <small>{{ __('LAPANGAN') }}</small>
                     <strong>{{ $booking?->lapangan?->nama ?? '-' }}</strong>
                 </div>
                 <div class="pay-item">
-                    <small>TANGGAL BERMAIN</small>
+                    <small>{{ __('TANGGAL BERMAIN') }}</small>
                     <strong>{{ $booking?->booking_date?->format('d M Y') ?? '-' }}</strong>
                 </div>
                 <div class="pay-item">
-                    <small>JAM BERMAIN</small>
+                    <small>{{ __('JAM BERMAIN') }}</small>
                     <strong>
                         {{ $booking ? substr((string) $booking->start_time, 0, 5) . '–' . substr((string) $booking->end_time, 0, 5) : '-' }}
                     </strong>
                 </div>
                 <div class="pay-item">
-                    <small>KODE PEMBAYARAN</small>
+                    <small>{{ __('KODE PEMBAYARAN') }}</small>
                     <strong>PAY-{{ str_pad((string) $payment->id, 5, '0', STR_PAD_LEFT) }}</strong>
                 </div>
                 <div class="pay-item">
-                    <small>STATUS</small>
+                    <small>{{ __('STATUS') }}</small>
                     <strong>{{ $payment->status ?? 'Menunggu' }}</strong>
                 </div>
             </div>
@@ -86,11 +86,11 @@
             <div class="pay-actions">
                 <button type="button" class="pay-btn" id="payNow">
                     <i class="fa-solid fa-credit-card"></i>
-                    Buka Pembayaran
+                    {{ __('Buka Pembayaran') }}
                 </button>
                 <a class="pay-btn secondary" href="{{ route('user.bookings') }}">
                     <i class="fa-solid fa-arrow-left"></i>
-                    Kembali ke Booking Saya
+                    {{ __('Kembali ke Booking Saya') }}
                 </a>
             </div>
 
@@ -107,12 +107,40 @@
 (function () {
     const token = @json($payment->snap_token);
     const statusUrl = @json($statusUrl);
+    const statusJsonUrl = @json($statusJsonUrl);
     const statusEl = document.getElementById('payStatus');
     const payButton = document.getElementById('payNow');
     let opening = false;
 
     function setStatus(message) {
         if (statusEl) statusEl.textContent = message;
+    }
+
+    async function pollPaymentStatus(attempts, delayMs, pendingMessage) {
+        for (let i = 0; i < attempts; i++) {
+            try {
+                const response = await fetch(statusJsonUrl, {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin'
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.paid && data.redirect_url) {
+                        setStatus('Pembayaran berhasil. Mengalihkan ke bukti pembayaran...');
+                        window.location.href = data.redirect_url;
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.warn('Status poll failed', e);
+            }
+
+            setStatus(pendingMessage + ' (' + (i + 1) + '/' + attempts + ')');
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+
+        window.location.href = statusUrl;
+        return false;
     }
 
     function openSnap() {
@@ -129,12 +157,12 @@
 
         window.snap.pay(token, {
             onSuccess: function () {
-                setStatus('Pembayaran berhasil. Mengalihkan...');
-                window.location.href = statusUrl;
+                setStatus('Pembayaran berhasil. Memverifikasi status...');
+                pollPaymentStatus(8, 2500, 'Memverifikasi pembayaran');
             },
             onPending: function () {
-                setStatus('Pembayaran menunggu. Memeriksa status...');
-                window.location.href = statusUrl;
+                setStatus('Pembayaran sedang diproses. Memeriksa status otomatis...');
+                pollPaymentStatus(12, 4000, 'Menunggu konfirmasi pembayaran (DANA/QRIS/VA dapat butuh beberapa saat)');
             },
             onError: function (result) {
                 opening = false;
@@ -143,7 +171,7 @@
             },
             onClose: function () {
                 opening = false;
-                setStatus('Jendela pembayaran ditutup. Klik "Buka Pembayaran" untuk melanjutkan.');
+                setStatus('Jendela pembayaran ditutup. Jika sudah bayar, tunggu sebentar lalu klik "Buka Pembayaran" atau muat ulang halaman.');
             }
         });
     }

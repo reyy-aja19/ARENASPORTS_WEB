@@ -41,10 +41,19 @@
             </div>
 
             <div class="form-group">
+                <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Jenis Pendaftaran <span style="color:#dc2626;">*</span></label>
+                <select class="select-ui" name="registration_type" id="registrationType" required>
+                    <option value="Tim" @selected(old('registration_type', $event->registration_type) === 'Tim')>Tim / Kelompok</option>
+                    <option value="Individu" @selected(old('registration_type', $event->registration_type) === 'Individu')>Individu</option>
+                </select>
+                <small style="color:#718078; margin-top:4px; display:block;">Menentukan apakah kuota dihitung per tim atau per peserta individu.</small>
+            </div>
+
+            <div class="form-group">
                 <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Status Event <span style="color:#dc2626;">*</span></label>
                 <select class="select-ui" name="status" required>
-                    <option value="Publikasi" @selected(old('status', $event->status) === 'Publikasi')>Publikasi (Aktif & Diumumkan)</option>
-                    <option value="Draft" @selected(old('status', $event->status) === 'Draft')>Draft (Belum Diumumkan)</option>
+                    <option value="Publikasi" @selected(old('status', $event->status) === 'Publikasi')>Publikasi (Dibuka untuk pendaftaran)</option>
+                    <option value="Draft" @selected(old('status', $event->status) === 'Draft')>Draft (Segera Dibuka)</option>
                     <option value="Dibatalkan" @selected(old('status', $event->status) === 'Dibatalkan')>Dibatalkan</option>
                 </select>
             </div>
@@ -55,14 +64,14 @@
             </div>
 
             <div class="form-group">
-                <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Kuota Peserta / Tim <span style="color:#dc2626;">*</span></label>
-                <input class="input-ui" type="number" name="kuota" min="1" max="10000" required value="{{ old('kuota', $event->kuota ?? 20) }}" placeholder="Jumlah peserta/tim maksimal">
+                <label id="quotaLabel" style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Kuota Tim <span style="color:#dc2626;">*</span></label>
+                <input class="input-ui" type="number" name="kuota" min="1" max="10000" required value="{{ old('kuota', $event->kuota ?? 20) }}" placeholder="Jumlah maksimal">
             </div>
 
             <div class="form-group">
-                <label style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Biaya Registrasi per Tim</label>
+                <label id="feeLabel" style="font-weight:700; color:#274333; margin-bottom:6px; display:block;">Biaya Registrasi per Tim</label>
                 <input class="input-ui" type="number" name="registration_fee" min="0" max="999999999" value="{{ old('registration_fee', $event->registration_fee ?? 0) }}" placeholder="0 = gratis">
-                <small style="color:#718078; margin-top:4px; display:block;">Isi 0 jika event gratis.</small>
+                <small id="feeHelp" style="color:#718078; margin-top:4px; display:block;">Isi 0 jika event gratis.</small>
             </div>
 
             <div class="form-group">
@@ -134,4 +143,25 @@
         </div>
     </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const typeSelect = document.getElementById('registrationType');
+    const quotaLabel = document.getElementById('quotaLabel');
+    const feeLabel = document.getElementById('feeLabel');
+    const feeHelp = document.getElementById('feeHelp');
+
+    function syncEventType() {
+        const isIndividual = typeSelect && typeSelect.value === 'Individu';
+        if (quotaLabel) quotaLabel.innerHTML = (isIndividual ? 'Kuota Peserta' : 'Kuota Tim') + ' <span style="color:#dc2626;">*</span>';
+        if (feeLabel) feeLabel.textContent = isIndividual ? 'Biaya Registrasi per Peserta' : 'Biaya Registrasi per Tim';
+        if (feeHelp) feeHelp.textContent = isIndividual ? 'Isi 0 jika event gratis untuk peserta.' : 'Isi 0 jika event gratis untuk tim.';
+    }
+
+    if (typeSelect) {
+        typeSelect.addEventListener('change', syncEventType);
+        syncEventType();
+    }
+});
+</script>
 @endsection

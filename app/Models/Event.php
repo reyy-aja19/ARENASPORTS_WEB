@@ -6,9 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class Event extends Model
 {
+    public const REGISTRATION_INDIVIDU = 'Individu';
+
+    public const REGISTRATION_TIM = 'Tim';
+
+    public const STATUS_DRAFT = 'Draft';
+
+    public const STATUS_PUBLIKASI = 'Publikasi';
+
+    public const STATUS_DIBATALKAN = 'Dibatalkan';
+
     protected $fillable = [
         'title',
         'jenis',
+        'registration_type',
         'tanggal',
         'start_time',
         'end_time',
@@ -46,6 +57,94 @@ class Event extends Model
     public function registrations()
     {
         return $this->hasMany(EventRegistration::class);
+    }
+
+    public static function registrationTypes(): array
+    {
+        return [self::REGISTRATION_INDIVIDU, self::REGISTRATION_TIM];
+    }
+
+    public function getIsIndividualAttribute(): bool
+    {
+        return $this->registration_type === self::REGISTRATION_INDIVIDU;
+    }
+
+    public function getRegistrationTypeLabelAttribute(): string
+    {
+        return $this->registration_type ?: self::REGISTRATION_TIM;
+    }
+
+    public function getQuotaUnitAttribute(): string
+    {
+        return $this->is_individual ? 'peserta' : 'tim';
+    }
+
+    public function getRegistrationCountAttribute(): int
+    {
+        if ($this->relationLoaded('registrations')) {
+            return $this->registrations->count();
+        }
+
+        return $this->registrations()->count();
+    }
+
+    public function getRemainingQuotaAttribute(): int
+    {
+        return max(0, (int) $this->kuota - $this->registration_count);
+    }
+
+    public function getIsFullAttribute(): bool
+    {
+        return (int) $this->kuota > 0 && $this->registration_count >= (int) $this->kuota;
+    }
+
+    public function getIsFinishedAttribute(): bool
+    {
+        return $this->tanggal !== null && $this->tanggal->lt(today());
+    }
+
+    public function getIsRegistrationClosedAttribute(): bool
+    {
+        return $this->is_full
+            || $this->is_finished
+            || ($this->registration_deadline !== null && $this->registration_deadline->lt(today()));
+    }
+
+    public function getDisplayStatusAttribute(): string
+    {
+        if ($this->status === self::STATUS_DIBATALKAN) {
+            return 'Dibatalkan';
+        }
+
+        if ($this->status === self::STATUS_DRAFT) {
+            return 'Segera Dibuka';
+        }
+
+        if ($this->is_finished) {
+            return 'Selesai';
+        }
+
+        if ($this->is_registration_closed) {
+            return 'Penuh';
+        }
+
+        return 'Dibuka';
+    }
+
+    public function getStatusToneAttribute(): string
+    {
+        return match ($this->display_status) {
+            'Segera Dibuka' => 'draft',
+            'Penuh' => 'full',
+            'Selesai' => 'done',
+            'Dibatalkan' => 'cancelled',
+            default => 'open',
+        };
+    }
+
+    public function getIsRegistrationOpenAttribute(): bool
+    {
+        return $this->status === self::STATUS_PUBLIKASI && ! $this->is_registration_closed;
     }
 
     /**

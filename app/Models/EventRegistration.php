@@ -9,6 +9,7 @@ class EventRegistration extends Model
     protected $fillable = [
         'event_id',
         'user_id',
+        'registration_type',
         'team_name',
         'captain_name',
         'captain_phone',
@@ -32,6 +33,18 @@ class EventRegistration extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function getIsIndividualAttribute(): bool
+    {
+        return $this->registration_type === Event::REGISTRATION_INDIVIDU;
+    }
+
+    public function getDisplayNameAttribute(): string
+    {
+        return $this->is_individual
+            ? (string) $this->captain_name
+            : (string) $this->team_name;
     }
 
     public function getWhatsappNumberAttribute(): ?string

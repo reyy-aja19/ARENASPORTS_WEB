@@ -17,6 +17,7 @@ class EventController extends Controller
         return $r->validate([
             'title' => ['required', 'string', 'max:255'],
             'jenis' => ['required', 'string', 'max:100'],
+            'registration_type' => ['required', 'in:Individu,Tim'],
             'tanggal' => ['required', 'date', 'after_or_equal:today'],
             'start_time' => ['nullable', 'date_format:H:i'],
             'end_time' => ['nullable', 'date_format:H:i'],
@@ -58,6 +59,7 @@ class EventController extends Controller
 
         $event = new Event([
             'jenis' => 'Futsal',
+            'registration_type' => 'Tim',
             'kuota' => 20,
             'registration_fee' => 0,
             'status' => 'Publikasi',
@@ -78,7 +80,7 @@ class EventController extends Controller
             User::where('role', 'user')->where('status', 'Aktif')->get()->each(function (User $user) use ($event) {
                 $user->notify(new ArenaUserNotification(
                     'Event Resmi Baru: ' . $event->title,
-                    'Event olahraga ' . $event->title . ' (' . $event->jenis . ') telah dibuka di ' . $event->lokasi . '. Kuota ' . $event->kuota . ' peserta.',
+                    'Event olahraga ' . $event->title . ' (' . $event->jenis . ') telah dibuka di ' . $event->lokasi . '. Kuota ' . $event->kuota . ' ' . $event->quota_unit . '.',
                     route('user.openmatches', [], false)
                 ));
             });
@@ -114,7 +116,7 @@ class EventController extends Controller
             User::where('role', 'user')->where('status', 'Aktif')->get()->each(function (User $user) use ($event) {
                 $user->notify(new ArenaUserNotification(
                     'Event Resmi Baru: ' . $event->title,
-                    'Event olahraga ' . $event->title . ' (' . $event->jenis . ') telah dibuka di ' . $event->lokasi . '. Kuota ' . $event->kuota . ' peserta.',
+                    'Event olahraga ' . $event->title . ' (' . $event->jenis . ') telah dibuka di ' . $event->lokasi . '. Kuota ' . $event->kuota . ' ' . $event->quota_unit . '.',
                     route('user.openmatches', [], false)
                 ));
             });

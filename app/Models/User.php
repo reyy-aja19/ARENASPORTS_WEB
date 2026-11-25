@@ -60,6 +60,11 @@ class User extends Authenticatable
         return $this->hasMany(VenueApplication::class);
     }
 
+    public function deviceTokens()
+    {
+        return $this->hasMany(UserDeviceToken::class);
+    }
+
     public function bookings()
     {
         return $this->hasMany(Booking::class);

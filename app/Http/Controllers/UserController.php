@@ -7,6 +7,7 @@ use App\Models\BookingExtension;
 use App\Models\Lapangan;
 use App\Models\OpenMatch;
 use App\Models\OpenMatchMessage;
+use App\Models\OpenMatchParticipant;
 use App\Models\Payment;
 use App\Models\Redemption;
 use App\Models\Review;
@@ -824,7 +825,7 @@ public function courts(Request $request): View
     {
         $user = $this->optionalUser($request);
 
-        $matches = OpenMatch::with(['booking.lapangan.venue', 'booking.user'])
+        $matches = OpenMatch::with(['booking.lapangan.venue', 'booking.user', 'participants'])
             ->whereIn('status', ['Open', 'Penuh'])
             ->whereDate('tanggal', '>=', today())
             ->orderBy('tanggal')
@@ -833,7 +834,21 @@ public function courts(Request $request): View
             ->filter(fn (OpenMatch $match) => ! $match->has_ended)
             ->values();
 
-        $events = Event::with(['creator.venue', 'creator.venues', 'venue'])
+        $myHistoryMatches = $user
+            ? OpenMatch::with(['booking.lapangan.venue', 'booking.user', 'participants'])
+                ->where(function ($query) use ($user) {
+                    $query->whereHas('booking', fn ($booking) => $booking->where('user_id', $user->id))
+                        ->orWhereHas('participants', fn ($participant) => $participant->where('users.id', $user->id));
+                })
+                ->where(function ($query) {
+                    $query->whereIn('status', ['Selesai', 'Dibatalkan'])
+                        ->orWhereDate('tanggal', '<', today());
+                })
+                ->latest('tanggal')
+                ->get()
+            : collect();
+
+        $events = Event::with(['creator.venue', 'creator.venues', 'venue', 'registrations.user'])
             ->where('status', 'Publikasi')
             ->whereDate('tanggal', '>=', today()->toDateString())
             ->orderBy('tanggal', 'asc')
@@ -861,6 +876,7 @@ public function courts(Request $request): View
         return view('user.open-matches', compact(
             'user',
             'matches',
+            'myHistoryMatches',
             'events',
             'eventRegistrations',
             'eligibleBookings'
@@ -1023,11 +1039,13 @@ public function courts(Request $request): View
         $data = $request->validate([
             'booking_id' => ['required', 'exists:bookings,id'],
             'title' => ['required', 'string', 'max:255'],
+            'registration_type' => ['required', 'in:Individu,Kelompok'],
+            'host_team_name' => ['nullable', 'required_if:registration_type,Kelompok', 'string', 'max:150'],
+            'host_member_count' => ['nullable', 'required_if:registration_type,Kelompok', 'integer', 'min:1', 'max:1000'],
             'jumlah_pemain' => ['required', 'integer', 'min:2', 'max:99'],
             'biaya_mode' => ['required', 'in:Gratis,Patungan'],
             'biaya_per_pemain' => ['nullable', 'integer', 'min:0', 'max:10000000', 'required_if:biaya_mode,Patungan'],
             'level' => ['nullable', 'string', 'max:50'],
-            'contact_phone' => ['nullable', 'string', 'max:30'],
             'deskripsi' => ['nullable', 'string', 'max:1500'],
         ]);
 
@@ -1075,6 +1093,7 @@ public function courts(Request $request): View
             'booking_id' => $booking->id,
             'title' => $data['title'],
             'jenis' => $booking->lapangan?->jenis ?? 'Futsal',
+            'registration_type' => $data['registration_type'],
             'tanggal' => $booking->booking_date,
             'start_time' => $booking->start_time,
             'end_time' => $booking->end_time,
@@ -1083,13 +1102,20 @@ public function courts(Request $request): View
             'deskripsi' => $data['deskripsi'] ?? null,
             'biaya_per_pemain' => $biayaPerPemain,
             'level' => $data['level'] ?? null,
-            'contact_phone' => $data['contact_phone'] ?: $user->phone,
+            'contact_phone' => $user->phone,
             'status' => 'Open',
         ]);
 
-        DB::table('open_match_participants')->insertOrIgnore([
+        OpenMatchParticipant::insertOrIgnore([
             'open_match_id' => $match->id,
             'user_id' => $user->id,
+            'role' => 'Host',
+            'team_name' => $data['registration_type'] === OpenMatch::REGISTRATION_KELOMPOK
+                ? ($data['host_team_name'] ?? null)
+                : null,
+            'member_count' => $data['registration_type'] === OpenMatch::REGISTRATION_KELOMPOK
+                ? (int) ($data['host_member_count'] ?? 1)
+                : 1,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -1112,6 +1138,11 @@ public function courts(Request $request): View
     ): RedirectResponse {
         $user = $this->currentUser($request);
 
+        $data = $request->validate([
+            'team_name' => [$openMatch->is_group ? 'required' : 'nullable', 'string', 'max:150'],
+            'member_count' => [$openMatch->is_group ? 'required' : 'nullable', 'integer', 'min:1', 'max:1000'],
+        ]);
+
         $matchStart = $openMatch->tanggal && $openMatch->start_time
             ? Carbon::parse(
                 $openMatch->tanggal->toDateString() .
@@ -1129,7 +1160,8 @@ public function courts(Request $request): View
 
         $result = DB::transaction(function () use (
             $openMatch,
-            $user
+            $user,
+            $data
         ) {
             $match = OpenMatch::whereKey($openMatch->id)
                 ->lockForUpdate()
@@ -1151,9 +1183,12 @@ public function courts(Request $request): View
                 return 'joined';
             }
 
-            DB::table('open_match_participants')->insert([
+            OpenMatchParticipant::insertOrIgnore([
                 'open_match_id' => $match->id,
                 'user_id' => $user->id,
+                'role' => 'Lawan',
+                'team_name' => $match->is_group ? ($data['team_name'] ?? null) : null,
+                'member_count' => $match->is_group ? (int) ($data['member_count'] ?? 1) : 1,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -1188,7 +1223,7 @@ public function courts(Request $request): View
 
         if ($result === 'full') {
             return back()->withErrors([
-                'match' => 'Slot pemain sudah penuh.',
+                'match' => 'Slot ' . $openMatch->capacity_label . ' sudah penuh.',
             ]);
         }
 
@@ -1206,11 +1241,13 @@ public function courts(Request $request): View
     {
         $user = $this->currentUser($request);
 
+        $isTeam = ! $event->is_individual;
+
         $data = $request->validate([
-            'team_name' => ['required', 'string', 'max:150'],
+            'team_name' => [Rule::requiredIf($isTeam), 'nullable', 'string', 'max:150'],
             'captain_name' => ['required', 'string', 'max:150'],
             'captain_phone' => ['required', 'string', 'max:30'],
-            'member_count' => ['required', 'integer', 'min:1', 'max:1000'],
+            'member_count' => [Rule::requiredIf($isTeam), 'nullable', 'integer', 'min:1', 'max:1000'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'agree' => ['accepted'],
         ]);
@@ -1229,7 +1266,7 @@ public function courts(Request $request): View
 
         if ((int) $event->kuota > 0
             && $event->registrations()->count() >= (int) $event->kuota) {
-            return back()->withErrors(['event' => 'Kuota tim untuk event ini sudah penuh.'])->withInput();
+            return back()->withErrors(['event' => 'Kuota '.$event->quota_unit.' untuk event ini sudah penuh.'])->withInput();
         }
 
         $alreadyRegistered = EventRegistration::where('event_id', $event->id)
@@ -1237,16 +1274,21 @@ public function courts(Request $request): View
             ->exists();
 
         if ($alreadyRegistered) {
-            return back()->withErrors(['event' => 'Kamu sudah mendaftarkan tim untuk event ini. Hubungi penyelenggara untuk perubahan data.']);
+            return back()->withErrors(['event' => 'Kamu sudah mendaftar untuk event ini. Hubungi penyelenggara untuk perubahan data.']);
         }
+
+        $participantName = $isTeam
+            ? $data['team_name']
+            : $data['captain_name'];
 
         $registration = EventRegistration::create([
             'event_id' => $event->id,
             'user_id' => $user->id,
-            'team_name' => $data['team_name'],
+            'registration_type' => $event->registration_type,
+            'team_name' => $participantName,
             'captain_name' => $data['captain_name'],
             'captain_phone' => $data['captain_phone'],
-            'member_count' => $data['member_count'],
+            'member_count' => $isTeam ? (int) $data['member_count'] : 1,
             'notes' => $data['notes'] ?? null,
             'status' => 'Baru',
         ]);
@@ -1254,12 +1296,17 @@ public function courts(Request $request): View
         $organizerName = $event->creator?->name ?? 'Penyelenggara';
         $phone = $event->whatsapp_number;
 
-        $message = "Halo {$organizerName}, saya {$registration->captain_name} dari tim "
-            ."{$registration->team_name}. Saya ingin mendaftar event \"{$event->title}\" "
-            ."({$event->jenis}) pada ".optional($event->tanggal)->format('d M Y').'. '
-            ."Jumlah anggota: {$registration->member_count} orang. "
-            .($registration->notes ? "Catatan: {$registration->notes}. " : '')
-            .'Mohon informasi teknis, kelengkapan, dan pembayaran selanjutnya. Terima kasih.';
+        $message = $isTeam
+            ? "Halo {$organizerName}, saya {$registration->captain_name} dari tim "
+                ."{$registration->team_name}. Saya ingin mendaftar event \"{$event->title}\" "
+                ."({$event->jenis}) pada ".optional($event->tanggal)->format('d M Y').'. '
+                ."Jumlah anggota: {$registration->member_count} orang. "
+                .($registration->notes ? "Catatan: {$registration->notes}. " : '')
+                .'Mohon informasi teknis, kelengkapan, dan pembayaran selanjutnya. Terima kasih.'
+            : "Halo {$organizerName}, saya {$registration->captain_name}. Saya ingin mendaftar sebagai peserta "
+                ."event \"{$event->title}\" ({$event->jenis}) pada ".optional($event->tanggal)->format('d M Y').'. '
+                .($registration->notes ? "Catatan: {$registration->notes}. " : '')
+                .'Mohon informasi teknis, kelengkapan, dan pembayaran selanjutnya. Terima kasih.';
 
         $waUrl = $phone
             ? 'https://wa.me/'.$phone.'?text='.urlencode($message)
@@ -1267,31 +1314,34 @@ public function courts(Request $request): View
 
         if ($event->creator) {
             $event->creator->notify(new ArenaUserNotification(
-                'Pendaftaran Tim Baru',
-                'Tim '.$registration->team_name.' mendaftar event '.$event->title.'.',
+                $isTeam ? 'Pendaftaran Tim Baru' : 'Pendaftaran Peserta Baru',
+                ($isTeam ? 'Tim ' : 'Peserta ').$registration->display_name.' mendaftar event '.$event->title.'.',
                 route('admin.events.registrations', $event, false)
             ));
         }
 
         return back()
-            ->with('success', 'Pendaftaran tim berhasil disimpan. Lanjutkan konfirmasi ke WhatsApp penyelenggara.')
+            ->with('success', 'Pendaftaran berhasil disimpan. Lanjutkan konfirmasi ke WhatsApp penyelenggara.')
             ->with('event_registration_success', [
-                'team_name' => $registration->team_name,
+                'team_name' => $registration->display_name,
                 'captain_name' => $registration->captain_name,
                 'event_title' => $event->title,
                 'wa_url' => $waUrl,
                 'organizer' => $organizerName,
+                'is_team' => $isTeam,
             ]);
     }
 
-    public function rewards(Request $request): View    {
+    public function rewards(Request $request): View
+    {
         $user = $this->currentUser($request);
 
-        $rewards = Reward::where('status', 'Aktif')
+        $rewards = Reward::with(['venue', 'owner'])
+            ->where('status', 'Aktif')
             ->orderBy('points_required')
             ->get();
 
-        $redemptions = Redemption::with('reward')
+        $redemptions = Redemption::with(['reward.venue', 'reward.owner', 'venue', 'owner'])
             ->where('user_id', $user->id)
             ->latest()
             ->get();
@@ -1326,29 +1376,35 @@ public function courts(Request $request): View
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if ($lockedUser->points < $reward->points_required) {
+            $lockedReward = Reward::with(['venue', 'owner'])->whereKey($reward->id)->lockForUpdate()->firstOrFail();
+
+            if ($lockedReward->status !== 'Aktif') {
+                abort(422, 'Reward sedang tidak tersedia.');
+            }
+
+            if ($lockedUser->points < $lockedReward->points_required) {
                 abort(422, 'Poin tidak mencukupi.');
             }
 
             $lockedUser->decrement(
                 'points',
-                $reward->points_required
+                $lockedReward->points_required
             );
 
             Redemption::create([
                 'user_id' => $lockedUser->id,
-                'reward_id' => $reward->id,
+                'reward_id' => $lockedReward->id,
+                'owner_admin_id' => $lockedReward->owner_admin_id,
+                'venue_id' => $lockedReward->venue_id,
                 'redeemed_at' => now(),
-                'qr_code' => 'AR-' . $lockedUser->id .
-                    '-' . $reward->id .
-                    '-' . Str::upper(Str::random(6)),
+                'qr_code' => 'AR-' . $lockedUser->id . '-' . $lockedReward->id . '-' . Str::upper(Str::random(6)),
                 'status' => 'Berhasil',
             ]);
 
+            $venueLabel = $lockedReward->venue?->name ?: 'ArenaSports';
             $lockedUser->notify(new ArenaUserNotification(
                 'Penukaran Reward Berhasil',
-                'Reward ' . $reward->title .
-                    ' berhasil ditukar. Poin telah dipotong dari saldo kamu.',
+                'Reward ' . $lockedReward->title . ' berhasil ditukar. Berlaku di: ' . $venueLabel . '. Poin telah dipotong dari saldo kamu.',
                 route('user.rewards', [], false)
             ));
         });
@@ -1362,8 +1418,15 @@ public function courts(Request $request): View
     public function profile(Request $request): View
     {
         $user = $this->currentUser($request);
+        $stats = [
+            'bookings' => $user->bookings()->count(),
+            'completed_bookings' => $user->bookings()->whereIn('status', ['Dikonfirmasi', 'Selesai'])->count(),
+            'redemptions' => \App\Models\Redemption::where('user_id', $user->id)->count(),
+            'reviews' => $user->reviews()->count(),
+            'member_since' => $user->created_at,
+        ];
 
-        return view('user.profile', compact('user'));
+        return view('user.profile', compact('user', 'stats'));
     }
 
     public function profileUpdate(

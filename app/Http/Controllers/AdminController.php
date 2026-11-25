@@ -7,6 +7,7 @@ use App\Models\BookingExtension;
 use App\Models\Event;
 use App\Models\Lapangan;
 use App\Models\OpenMatch;
+use App\Models\OpenMatchParticipant;
 use App\Models\Payment;
 use App\Models\Redemption;
 use App\Models\Review;
@@ -741,18 +742,42 @@ class AdminController extends Controller
     public function openMatches(Request $request): View
     {
         $courtIds = $this->ownedCourtsQuery($request)->select('id');
-        $query = OpenMatch::with(['booking.user', 'booking.lapangan.venue']);
+        $filter = $request->query('filter', 'aktif');
+
+        $baseQuery = OpenMatch::with(['booking.user', 'booking.lapangan.venue', 'participants']);
         if (!$this->isSuperadmin($request)) {
-            $query->whereHas('booking.lapangan', fn ($q) => $q->whereIn('id', $courtIds));
+            $baseQuery->whereHas('booking.lapangan', fn ($q) => $q->whereIn('id', $courtIds));
         }
-        $matches = $query->latest()->get();
+
+        $allMatches = (clone $baseQuery)->latest('tanggal')->latest('start_time')->get();
+        $isFinished = fn ($match) => $match->status === 'Selesai' || $match->has_ended;
+        $isCancelled = fn ($match) => $match->status === 'Dibatalkan';
+
+        $counts = [
+            'aktif' => $allMatches->filter(fn ($m) => ! $isCancelled($m) && ! $isFinished($m))->count(),
+            'selesai' => $allMatches->filter(fn ($m) => ! $isCancelled($m) && $isFinished($m))->count(),
+            'dibatalkan' => $allMatches->filter(fn ($m) => $isCancelled($m))->count(),
+            'semua' => $allMatches->count(),
+        ];
+
+        if (! in_array($filter, ['aktif', 'selesai', 'dibatalkan', 'semua'], true)) {
+            $filter = 'aktif';
+        }
+
+        $matches = match ($filter) {
+            'selesai' => $allMatches->filter(fn ($m) => ! $isCancelled($m) && $isFinished($m))->values(),
+            'dibatalkan' => $allMatches->filter(fn ($m) => $isCancelled($m))->values(),
+            'semua' => $allMatches->values(),
+            default => $allMatches->filter(fn ($m) => ! $isCancelled($m) && ! $isFinished($m))->values(),
+        };
+
         $bookings = Booking::with(['user', 'lapangan'])
             ->whereIn('lapangan_id', $courtIds)
             ->whereIn('status', ['Lunas', 'DP'])
             ->latest()
             ->get();
 
-        return view('admin.open-matches', $this->layoutData($request, compact('matches', 'bookings')));
+        return view('admin.open-matches', $this->layoutData($request, compact('matches', 'bookings', 'filter', 'counts')));
     }
 
     public function openMatchStore(Request $request): RedirectResponse
@@ -761,6 +786,7 @@ class AdminController extends Controller
             'booking_id' => ['nullable', 'exists:bookings,id'],
             'title' => ['required', 'string', 'max:255'],
             'jenis' => ['required', 'string', 'max:100'],
+            'registration_type' => ['nullable', 'in:Individu,Kelompok'],
             'tanggal' => ['required', 'date'],
             'start_time' => ['nullable'],
             'end_time' => ['nullable'],
@@ -778,7 +804,23 @@ class AdminController extends Controller
             $this->ensureBookingAccess($request, $booking);
         }
         $data['jumlah_bergabung'] = $data['jumlah_bergabung'] ?? 0;
+        $data['registration_type'] = $data['registration_type'] ?? 'Individu';
         $match = OpenMatch::create($data);
+
+        if (! empty($data['booking_id'])) {
+            $hostId = Booking::find($data['booking_id'])?->user_id;
+
+            if ($hostId) {
+                OpenMatchParticipant::insertOrIgnore([
+                    'open_match_id' => $match->id,
+                    'user_id' => $hostId,
+                    'role' => 'Host',
+                    'member_count' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
 
         // Notifikasi realtime ke semua user aktif
         User::where('role', 'user')->where('status', 'Aktif')->get()->each(function (User $user) use ($match) {
@@ -798,6 +840,7 @@ class AdminController extends Controller
             'booking_id' => ['nullable', 'exists:bookings,id'],
             'title' => ['required', 'string', 'max:255'],
             'jenis' => ['required', 'string', 'max:100'],
+            'registration_type' => ['nullable', 'in:Individu,Kelompok'],
             'tanggal' => ['required', 'date'],
             'start_time' => ['nullable'],
             'end_time' => ['nullable'],
@@ -814,6 +857,7 @@ class AdminController extends Controller
         $wasCancelled = $openMatch->status === 'Dibatalkan';
         if (!empty($data['booking_id'])) { $this->ensureBookingAccess($request, Booking::findOrFail($data['booking_id'])); }
         $data['jumlah_bergabung'] = $data['jumlah_bergabung'] ?? 0;
+        $data['registration_type'] = $data['registration_type'] ?? $openMatch->registration_type ?? 'Individu';
         $openMatch->update($data);
         if (!$wasCancelled && $openMatch->status === 'Dibatalkan') {
             $openMatch->loadMissing('booking.user');
@@ -892,45 +936,129 @@ class AdminController extends Controller
         return back()->with('success', 'Review berhasil dihapus.');
     }
 
+    private function ensureRewardAccess(Request $request, Reward $reward): void
+    {
+        if ($this->isSuperadmin($request)) {
+            return;
+        }
+
+        abort_unless((int) $reward->owner_admin_id === (int) $request->session()->get('admin_user_id'), 403);
+    }
+
+    private function rewardVenues(Request $request)
+    {
+        if ($this->isSuperadmin($request)) {
+            return Venue::orderBy('name')->get();
+        }
+
+        return Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->orderBy('name')->get();
+    }
+
     public function rewards(Request $request): View
     {
-        $rewards = Reward::latest()->get();
-        $redemptions = Redemption::with(['reward', 'user'])->latest()->get();
-        return view('admin.rewards', $this->layoutData($request, compact('rewards', 'redemptions')));
+        $isSuperadmin = $this->isSuperadmin($request);
+        $adminId = (int) $request->session()->get('admin_user_id');
+
+        $rewardsQuery = Reward::with(['owner', 'venue'])->latest();
+        $redemptionsQuery = Redemption::with(['reward.venue', 'reward.owner', 'user', 'venue', 'owner'])->latest();
+
+        if (! $isSuperadmin) {
+            $rewardsQuery->where(function ($q) use ($adminId) {
+                $q->where('owner_admin_id', $adminId)->orWhereNull('owner_admin_id');
+            });
+            $redemptionsQuery->where(function ($q) use ($adminId) {
+                $q->where('owner_admin_id', $adminId)
+                    ->orWhereHas('reward', fn ($reward) => $reward->where('owner_admin_id', $adminId));
+            });
+        }
+
+        $rewards = $rewardsQuery->get();
+        $redemptions = $redemptionsQuery->get();
+        $venues = $this->rewardVenues($request);
+
+        return view('admin.rewards', $this->layoutData($request, compact('rewards', 'redemptions', 'venues', 'isSuperadmin')));
     }
 
     public function rewardStore(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'points_required' => ['required', 'numeric', 'min:0'],
+            'points_required' => ['required', 'integer', 'min:0'],
             'badge' => ['nullable', 'string', 'max:50'],
-            'description' => ['nullable', 'string'],
-            'status' => ['required', 'string'],
-            'image' => ['nullable', 'image', 'max:4096'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'status' => ['required', 'in:Aktif,Nonaktif'],
+            'venue_id' => ['nullable', 'integer', 'exists:venues,id'],
+            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ], [
+            'title.required' => 'Judul reward wajib diisi.',
+            'points_required.required' => 'Poin reward wajib diisi.',
+            'points_required.integer' => 'Poin reward harus berupa angka bulat.',
+            'status.in' => 'Status reward harus Aktif atau Nonaktif.',
+            'image.image' => 'File reward harus berupa gambar.',
         ]);
+
+        $isSuperadmin = $this->isSuperadmin($request);
+        $adminId = (int) $request->session()->get('admin_user_id');
+        $venueId = $data['venue_id'] ?? null;
+
+        if ($venueId) {
+            $venue = Venue::find($venueId);
+            abort_unless($venue && ($isSuperadmin || (int) $venue->owner_admin_id === $adminId), 403);
+        }
+
+        $data['owner_admin_id'] = $isSuperadmin ? ($venueId ? (Venue::find($venueId)?->owner_admin_id) : $adminId) : $adminId;
+        $data['venue_id'] = $venueId ?: null;
+
         if ($request->hasFile('image')) {
             $data['image'] = $this->publicUpload($request, 'image', 'rewards');
         }
+
         Reward::create($data);
+
         return back()->with('success', 'Reward berhasil ditambahkan.');
     }
 
     public function rewardEdit(Request $request, Reward $reward): View
     {
-        return view('admin.reward-edit', $this->layoutData($request, compact('reward')));
+        $this->ensureRewardAccess($request, $reward);
+        $venues = $this->rewardVenues($request);
+        $isSuperadmin = $this->isSuperadmin($request);
+        return view('admin.reward-edit', $this->layoutData($request, compact('reward', 'venues', 'isSuperadmin')));
     }
 
     public function rewardUpdate(Request $request, Reward $reward): RedirectResponse
     {
+        $this->ensureRewardAccess($request, $reward);
+
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'points_required' => ['required', 'numeric', 'min:0'],
+            'points_required' => ['required', 'integer', 'min:0'],
             'badge' => ['nullable', 'string', 'max:50'],
-            'description' => ['nullable', 'string'],
-            'status' => ['required', 'string'],
-            'image' => ['nullable', 'image', 'max:4096'],
+            'description' => ['nullable', 'string', 'max:2000'],
+            'status' => ['required', 'in:Aktif,Nonaktif'],
+            'venue_id' => ['nullable', 'integer', 'exists:venues,id'],
+            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+        ], [
+            'title.required' => 'Judul reward wajib diisi.',
+            'points_required.required' => 'Poin reward wajib diisi.',
+            'points_required.integer' => 'Poin reward harus berupa angka bulat.',
+            'status.in' => 'Status reward harus Aktif atau Nonaktif.',
+            'image.image' => 'File reward harus berupa gambar.',
         ]);
+
+        $isSuperadmin = $this->isSuperadmin($request);
+        $adminId = (int) $request->session()->get('admin_user_id');
+        $venueId = $data['venue_id'] ?? null;
+
+        if ($venueId) {
+            $venue = Venue::find($venueId);
+            abort_unless($venue && ($isSuperadmin || (int) $venue->owner_admin_id === $adminId), 403);
+        }
+
+        $data['venue_id'] = $venueId ?: null;
+        if (! $isSuperadmin) {
+            $data['owner_admin_id'] = $adminId;
+        }
 
         if ($request->hasFile('image')) {
             $this->deletePublicUpload($reward->image);
@@ -938,20 +1066,48 @@ class AdminController extends Controller
         }
 
         $reward->update($data);
+
         return redirect()->route('admin.rewards')->with('success', 'Reward berhasil diperbarui.');
     }
 
-    public function rewardToggle(Reward $reward): RedirectResponse
+    public function rewardToggle(Request $request, Reward $reward): RedirectResponse
     {
+        $this->ensureRewardAccess($request, $reward);
         $reward->update(['status' => $reward->status === 'Aktif' ? 'Nonaktif' : 'Aktif']);
         return back()->with('success', 'Status reward berhasil diperbarui.');
     }
 
-    public function rewardDelete(Reward $reward): RedirectResponse
+    public function rewardDelete(Request $request, Reward $reward): RedirectResponse
     {
+        $this->ensureRewardAccess($request, $reward);
         $this->deletePublicUpload($reward->image);
         $reward->delete();
         return back()->with('success', 'Reward berhasil dihapus.');
+    }
+
+    public function redemptionVerify(Request $request, Redemption $redemption): RedirectResponse
+    {
+        $redemption->loadMissing('reward');
+        $isSuperadmin = $this->isSuperadmin($request);
+        $adminId = (int) $request->session()->get('admin_user_id');
+        $ownerId = $redemption->owner_admin_id ?? $redemption->reward?->owner_admin_id;
+        abort_unless($isSuperadmin || ($ownerId && (int) $ownerId === $adminId), 403);
+
+        $redemption->update([
+            'status' => 'Diverifikasi',
+            'verified_at' => now(),
+            'verified_by' => $adminId,
+        ]);
+
+        if ($redemption->user) {
+            $redemption->user->notify(new ArenaUserNotification(
+                'Reward Diverifikasi',
+                'Reward ' . ($redemption->reward?->title ?? 'Reward') . ' telah diverifikasi oleh venue/admin.',
+                route('user.rewards', [], false)
+            ));
+        }
+
+        return back()->with('success', 'Penukaran reward berhasil diverifikasi.');
     }
 
     public function payments(Request $request): View
@@ -1036,6 +1192,38 @@ class AdminController extends Controller
             'success',
             'Pembayaran Cash berhasil dikonfirmasi. Booking sekarang berstatus Lunas.'
         );
+    }
+
+    public function paymentSync(Request $request, Payment $payment): RedirectResponse
+    {
+        $payment->loadMissing('booking.lapangan');
+        abort_unless($payment->booking, 404);
+        $this->ensureBookingAccess($request, $payment->booking);
+
+        if (strtolower((string) $payment->method) === 'cash') {
+            return back()->with('error', 'Pembayaran Cash tidak perlu disinkronkan dari Midtrans.');
+        }
+
+        try {
+            app(\App\Http\Controllers\MidtransController::class)->syncForAdmin($payment);
+            $payment->refresh();
+
+            $isPaid = in_array(strtolower((string) $payment->status), ['lunas', 'settlement', 'capture', 'success', 'paid'], true);
+
+            return back()->with(
+                $isPaid ? 'success' : 'error',
+                $isPaid
+                    ? 'Status Midtrans berhasil disinkronkan. Pembayaran sudah Lunas.'
+                    : 'Status Midtrans diperiksa: ' . $payment->status . '. Jika pengguna sudah bayar DANA/QRIS, tunggu beberapa saat lalu cek lagi.'
+            );
+        } catch (\Throwable $e) {
+            \Log::warning('Admin payment sync failed', [
+                'payment_id' => $payment->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Gagal mengecek status Midtrans. Coba lagi beberapa saat.');
+        }
     }
 
     public function reports(Request $request): View

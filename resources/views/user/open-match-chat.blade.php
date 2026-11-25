@@ -28,10 +28,10 @@
 <div class="om-chat">
     <header class="om-head">
         <div>
-            <h2><i class="fa-solid fa-comments"></i> Obrolan Open Match</h2>
-            <p>{{ $openMatch->title }} · {{ $openMatch->tanggal?->format('d M Y') }} · {{ $openMatch->start_time }}–{{ $openMatch->end_time }}</p>
+            <h2><i class="fa-solid fa-comments"></i> {{ __('Obrolan Peserta Open Match') }}</h2>
+            <p>{{ $openMatch->title }} · {{ $openMatch->registration_type_label }} · {{ $openMatch->display_status }} · {{ $openMatch->tanggal?->format('d M Y') }} · {{ $openMatch->start_time }}–{{ $openMatch->end_time }}</p>
         </div>
-        <a class="om-back" href="{{ route('user.openmatches') }}">Kembali</a>
+        <a class="om-back" href="{{ route('user.openmatches') }}">{{ __('Kembali') }}</a>
     </header>
 
     <div class="om-messages" id="omMessages">
@@ -51,14 +51,14 @@
                 @endif
             </div>
         @empty
-            <div class="om-empty" id="omEmpty">Belum ada pesan. Mulai obrolan dengan menyapa pemain lain!</div>
+            <div class="om-empty" id="omEmpty">{{ __('Belum ada pesan. Mulai obrolan dengan menyapa pemain lain!') }}</div>
         @endforelse
     </div>
 
     <form class="om-form" method="POST" enctype="multipart/form-data" action="{{ route('user.openmatches.chat.send', $openMatch) }}">
         @csrf
-        <textarea name="message" maxlength="2000" placeholder="Tulis pesan untuk pemain...">{{ old('message') }}</textarea>
-        <label class="om-file"><i class="fa-regular fa-image"></i> Kirim foto
+        <textarea name="message" maxlength="2000" placeholder="{{ __('Tulis pesan untuk pemain...') }}">{{ old('message') }}</textarea>
+        <label class="om-file"><i class="fa-regular fa-image"></i> {{ __('Kirim foto') }}
             <input type="file" name="attachment" accept="image/jpeg,image/png,image/webp">
         </label>
         <button type="submit"><i class="fa-solid fa-paper-plane"></i> Kirim</button>

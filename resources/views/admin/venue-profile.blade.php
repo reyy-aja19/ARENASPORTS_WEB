@@ -358,10 +358,7 @@
 
 <div class="venue-profile-wrapper">
 
-    <div class="venue-profile-header">
-        <h2>Profil Venue</h2>
-        <p>Kelola informasi dan identitas venue olahraga Anda.</p>
-    </div>
+    <p style="margin:0 0 20px;color:#718078;font-size:14px;">Kelola informasi dan identitas venue olahraga Anda.</p>
 
     @if(session('success'))
         <div class="venue-alert venue-alert-success">

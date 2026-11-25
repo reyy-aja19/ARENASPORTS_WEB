@@ -92,8 +92,8 @@
     @empty
       <div class="payment-history-empty">
         <i class="fa-regular fa-credit-card" style="font-size:30px;color:#16846b"></i>
-        <strong>Belum ada riwayat pembayaran</strong>
-        Transaksi booking dan detail pembayarannya akan tampil di sini.
+        <strong>{{ __('Belum ada riwayat pembayaran') }}</strong>
+        {{ __('Transaksi booking dan detail pembayarannya akan tampil di sini.') }}
       </div>
     @endforelse
   </div>

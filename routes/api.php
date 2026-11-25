@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\AdminBroadcastController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BookingController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\ChatbotController;
+use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\HomeController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OpenMatchController;
@@ -131,6 +133,13 @@ Route::middleware('api.token')->group(function () {
     Route::delete('/notifications', [NotificationController::class, 'clear']);
     Route::post('/notifications/{notification}/read', [NotificationController::class, 'read']);
     Route::delete('/notifications/{notification}', [NotificationController::class, 'destroy']);
+
+    // Device token FCM
+    Route::post('/device-tokens', [DeviceTokenController::class, 'store']);
+    Route::delete('/device-tokens', [DeviceTokenController::class, 'destroy']);
+
+    // Admin broadcast
+    Route::post('/admin/broadcast-notifications', [AdminBroadcastController::class, 'store']);
 
     // Pengajuan venue
     Route::get('/venue-application', [VenueApplicationController::class, 'show']);

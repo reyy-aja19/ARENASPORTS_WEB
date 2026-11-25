@@ -122,13 +122,11 @@
                 @endif
             </a>
 
-            @if($isSuperAdmin)
-                <a class="sidebar-link {{ request()->routeIs('admin.rewards*') ? 'active' : '' }}"
-                   href="{{ route('admin.rewards') }}">
-                    <span class="menu-icon"><i class="fa-solid fa-gift"></i></span>
-                    <span class="label">Poin & Voucher</span>
-                </a>
-            @endif
+            <a class="sidebar-link {{ request()->routeIs('admin.rewards*') ? 'active' : '' }}"
+               href="{{ route('admin.rewards') }}">
+                <span class="menu-icon"><i class="fa-solid fa-gift"></i></span>
+                <span class="label">Poin & Voucher</span>
+            </a>
 
             <a class="sidebar-link {{ request()->routeIs('admin.payments*') ? 'active' : '' }}"
                href="{{ route('admin.payments') }}">

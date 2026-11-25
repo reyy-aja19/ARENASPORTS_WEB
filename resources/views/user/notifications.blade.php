@@ -33,22 +33,22 @@
 <div class="notif-page">
     <div class="notif-page-head">
         <div>
-            <h2>Riwayat Notifikasi</h2>
-            <p>Kelola informasi booking, pembayaran, Open Match, dan reward akun kamu.</p>
+            <h2>{{ __('Riwayat Notifikasi') }}</h2>
+            <p>{{ __('Kelola informasi booking, pembayaran, Open Match, dan reward akun kamu.') }}</p>
         </div>
         <div class="notif-page-actions">
             <form method="POST" action="{{ route('user.notifications.read-all') }}">
                 @csrf
                 <button class="notif-action" type="submit" {{ $user->unreadNotifications()->exists() ? '' : 'disabled' }}>
-                    <i class="fa-solid fa-check-double"></i> Tandai semua sudah dibaca
+                    <i class="fa-solid fa-check-double"></i> {{ __('Tandai semua sudah dibaca') }}
                 </button>
             </form>
             <form method="POST" action="{{ route('user.notifications.clear') }}"
-                  onsubmit="return confirm('Hapus seluruh notifikasi akun ini? Tindakan ini tidak dapat dibatalkan.');">
+                  onsubmit="return confirm('{{ __('Hapus seluruh notifikasi akun ini? Tindakan ini tidak dapat dibatalkan.') }}');">
                 @csrf
                 @method('DELETE')
                 <button class="notif-action danger" type="submit" {{ $user->notifications()->exists() ? '' : 'disabled' }}>
-                    <i class="fa-regular fa-trash-can"></i> Clear semua
+                    <i class="fa-regular fa-trash-can"></i> {{ __('Clear semua') }}
                 </button>
             </form>
         </div>
@@ -65,7 +65,7 @@
                 <div class="notif-history-content">
                     <div class="notif-history-title">
                         {{ $notification->data['title'] ?? 'Notifikasi ArenaSports' }}
-                        @if(!$notification->read_at)<span class="notif-unread-tag">BELUM DIBACA</span>@endif
+                        @if(!$notification->read_at)<span class="notif-unread-tag">{{ __('BELUM DIBACA') }}</span>@endif
                     </div>
                     <p>{{ $notification->data['message'] ?? '' }}</p>
                     <small><i class="fa-regular fa-clock"></i> {{ $notification->created_at?->format('d M Y, H:i') }} · {{ $notification->created_at?->diffForHumans() }}</small>
@@ -74,25 +74,25 @@
                     @if(!$notification->read_at)
                         <form method="POST" action="{{ route('user.notifications.mark-read', $notification->id) }}">
                             @csrf
-                            <button class="notif-action" type="submit"><i class="fa-solid fa-check"></i> Tandai dibaca</button>
+                            <button class="notif-action" type="submit"><i class="fa-solid fa-check"></i> {{ __('Tandai dibaca') }}</button>
                         </form>
                     @endif
                     <form method="POST" action="{{ route('user.notifications.read', $notification->id) }}">
                         @csrf
-                        <button class="notif-action" type="submit"><i class="fa-regular fa-folder-open"></i> Buka</button>
+                        <button class="notif-action" type="submit"><i class="fa-regular fa-folder-open"></i> {{ __('Buka') }}</button>
                     </form>
-                    <form method="POST" action="{{ route('user.notifications.delete', $notification->id) }}" onsubmit="return confirm('Hapus notifikasi ini?');">
+                    <form method="POST" action="{{ route('user.notifications.delete', $notification->id) }}" onsubmit="return confirm('{{ __('Hapus notifikasi ini?') }}');">
                         @csrf
                         @method('DELETE')
-                        <button class="notif-action danger" type="submit"><i class="fa-regular fa-trash-can"></i> Hapus</button>
+                        <button class="notif-action danger" type="submit"><i class="fa-regular fa-trash-can"></i> {{ __('Hapus') }}</button>
                     </form>
                 </div>
             </article>
         @empty
             <div class="notif-empty-state">
                 <i class="fa-regular fa-bell-slash"></i>
-                <strong>Belum ada notifikasi</strong>
-                <span>Notifikasi aktivitas kamu akan muncul di sini.</span>
+                <strong>{{ __('Belum ada notifikasi') }}</strong>
+                <span>{{ __('Notifikasi aktivitas kamu akan muncul di sini.') }}</span>
             </div>
         @endforelse
     </div>

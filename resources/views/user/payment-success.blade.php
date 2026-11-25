@@ -27,50 +27,50 @@
     <div class="success-card">
         <div class="success-hero">
             <div class="success-icon"><i class="fa-solid fa-check"></i></div>
-            <h2>Pembayaran Berhasil!</h2>
-            <p>Pembayaran sejumlah</p>
+            <h2>{{ __('Pembayaran Berhasil!') }}</h2>
+            <p>{{ __('Pembayaran sejumlah') }}</p>
 
             <div class="success-amount">
                 <small>Rp</small>
                 {{ number_format($amount, 0, ',', '.') }}
-                <small>selesai</small>
+                <small>{{ __('selesai') }}</small>
             </div>
         </div>
 
         <div class="success-body">
             <div class="success-grid">
                 <div class="success-item">
-                    <small>VENUE</small>
+                    <small>{{ __('VENUE') }}</small>
                     <strong>{{ $booking?->lapangan?->venue?->name ?? $booking?->lapangan?->nama ?? 'ArenaSports' }}</strong>
                 </div>
                 <div class="success-item">
-                    <small>LAPANGAN</small>
+                    <small>{{ __('LAPANGAN') }}</small>
                     <strong>{{ $booking?->lapangan?->nama ?? '-' }}</strong>
                 </div>
                 <div class="success-item">
-                    <small>TANGGAL BERMAIN</small>
+                    <small>{{ __('TANGGAL BERMAIN') }}</small>
                     <strong>{{ $booking?->booking_date?->format('d M Y') ?? '-' }}</strong>
                 </div>
                 <div class="success-item">
-                    <small>JAM BERMAIN</small>
+                    <small>{{ __('JAM BERMAIN') }}</small>
                     <strong>
                         {{ $booking ? substr((string) $booking->start_time, 0, 5) . '–' . substr((string) $booking->end_time, 0, 5) : '-' }}
                     </strong>
                 </div>
                 <div class="success-item">
-                    <small>METODE PEMBAYARAN</small>
+                    <small>{{ __('METODE PEMBAYARAN') }}</small>
                     <strong>{{ $payment->method ?? 'Midtrans' }}</strong>
                 </div>
                 <div class="success-item">
-                    <small>ID TRANSAKSI</small>
+                    <small>{{ __('ID TRANSAKSI') }}</small>
                     <strong>{{ $payment->transaction_id ?: ($payment->midtrans_order_id ?: '-') }}</strong>
                 </div>
                 <div class="success-item">
-                    <small>WAKTU PEMBAYARAN</small>
+                    <small>{{ __('WAKTU PEMBAYARAN') }}</small>
                     <strong>{{ $payment->paid_at?->format('d M Y, H:i') ?? now()->format('d M Y, H:i') }}</strong>
                 </div>
                 <div class="success-item">
-                    <small>KODE PEMBAYARAN</small>
+                    <small>{{ __('KODE PEMBAYARAN') }}</small>
                     <strong>PAY-{{ str_pad((string) $payment->id, 5, '0', STR_PAD_LEFT) }}</strong>
                 </div>
             </div>
@@ -79,19 +79,19 @@
                 @if($booking)
                     <a class="success-btn" href="{{ route('user.bookings.ticket', $booking) }}">
                         <i class="fa-solid fa-ticket"></i>
-                        Lihat Tiket & QR
+                        {{ __('Lihat Tiket & QR') }}
                     </a>
                 @endif
 
                 <a class="success-btn secondary" href="{{ route('user.bookings') }}">
                     <i class="fa-solid fa-calendar-check"></i>
-                    Booking Saya
+                    {{ __('Booking Saya') }}
                 </a>
             </div>
 
             <p class="success-note">
                 <i class="fa-solid fa-circle-info"></i>
-                Tunjukkan tiket dan QR code kepada petugas venue saat tiba. Simpan halaman ini sebagai bukti pembayaran.
+                {{ __('Tunjukkan tiket dan QR code kepada petugas venue saat tiba. Simpan halaman ini sebagai bukti pembayaran.') }}
             </p>
         </div>
     </div>

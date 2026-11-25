@@ -6,20 +6,20 @@
 <div class="ticket-detail">
   <a class="ticket-btn alt no-print" href="{{ route('user.bookings') }}">← Kembali ke Booking Saya</a>
   <section class="ticket-paper" style="margin-top:18px">
-    <header class="ticket-banner"><div><div class="ticket-code">ARENASPORTS · E-TICKET</div><h1>{{ $booking->lapangan?->nama ?? 'Lapangan' }}</h1><p>Tunjukkan QR atau kode ini kepada petugas venue.</p></div><strong style="color:#13785f">✓ LUNAS</strong></header>
+    <header class="ticket-banner"><div><div class="ticket-code">ARENASPORTS · E-TICKET</div><h1>{{ $booking->lapangan?->nama ?? 'Lapangan' }}</h1><p>{{ __('Tunjukkan QR atau kode ini kepada petugas venue.') }}</p></div><strong style="color:#13785f">✓ LUNAS</strong></header>
     <div class="ticket-content">
       <div>
         <div class="ticket-grid">
-          <div><small>KODE TIKET</small><strong>{{ $ticketCode }}</strong></div>
-          <div><small>NAMA PEMESAN</small><strong>{{ $user->name }}</strong></div>
-          <div><small>TANGGAL BERMAIN</small><strong>{{ $booking->booking_date?->format('d M Y') ?? '-' }}</strong></div>
-          <div><small>JAM BERMAIN</small><strong>{{ substr((string) $booking->start_time, 0, 5) }}–{{ substr((string) $booking->end_time, 0, 5) }}</strong></div>
-          <div><small>DURASI</small><strong>{{ $booking->hours ?? 1 }} jam</strong></div>
-          <div><small>TOTAL DIBAYAR</small><strong>Rp {{ number_format((float) $booking->total_price, 0, ',', '.') }}</strong></div>
-          <div><small>STATUS PEMBAYARAN</small><strong>{{ $booking->payment?->status ?? $booking->status }}</strong></div>
-          <div><small>ID PEMBAYARAN</small><strong>{{ $booking->payment?->transaction_id ?? '-' }}</strong></div>
+          <div><small>{{ __('KODE TIKET') }}</small><strong>{{ $ticketCode }}</strong></div>
+          <div><small>{{ __('NAMA PEMESAN') }}</small><strong>{{ $user->name }}</strong></div>
+          <div><small>{{ __('TANGGAL BERMAIN') }}</small><strong>{{ $booking->booking_date?->format('d M Y') ?? '-' }}</strong></div>
+          <div><small>{{ __('JAM BERMAIN') }}</small><strong>{{ substr((string) $booking->start_time, 0, 5) }}–{{ substr((string) $booking->end_time, 0, 5) }}</strong></div>
+          <div><small>{{ __('DURASI') }}</small><strong>{{ $booking->hours ?? 1 }} jam</strong></div>
+          <div><small>{{ __('TOTAL DIBAYAR') }}</small><strong>Rp {{ number_format((float) $booking->total_price, 0, ',', '.') }}</strong></div>
+          <div><small>{{ __('STATUS PEMBAYARAN') }}</small><strong>{{ $booking->payment?->status ?? $booking->status }}</strong></div>
+          <div><small>{{ __('ID PEMBAYARAN') }}</small><strong>{{ $booking->payment?->transaction_id ?? '-' }}</strong></div>
         </div>
-        <div class="ticket-actions no-print"><button class="ticket-btn" onclick="window.print()">Cetak / Simpan PDF</button><a class="ticket-btn alt" href="{{ route('user.bookings') }}">Booking Saya</a></div>
+        <div class="ticket-actions no-print"><button class="ticket-btn" onclick="window.print()">{{ __('Cetak / Simpan PDF') }}</button><a class="ticket-btn alt" href="{{ route('user.bookings') }}">{{ __('Booking Saya') }}</a></div>
       </div>
       @php
         $ticketQrText = "ArenaSports E-Ticket\n"
@@ -29,9 +29,9 @@
             . "Jam: " . substr((string) $booking->start_time, 0, 5) . '-' . substr((string) $booking->end_time, 0, 5) . "\n"
             . "Kode: " . $ticketCode;
       @endphp
-      <aside class="ticket-qr"><div style="background:#fff;padding:10px;border-radius:12px;display:inline-block"><img src="https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&ecc=M&data={{ urlencode($ticketQrText) }}" alt="QR tiket {{ $ticketCode }}" style="width:180px;height:180px;display:block;image-rendering:pixelated"></div><small style="display:block;margin-top:10px;color:#4b5563;font-weight:700">SCAN KODE TIKET</small><code>{{ $ticketCode }}</code></aside>
+      <aside class="ticket-qr"><div style="background:#fff;padding:10px;border-radius:12px;display:inline-block"><img src="https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&ecc=M&data={{ urlencode($ticketQrText) }}" alt="QR tiket {{ $ticketCode }}" style="width:180px;height:180px;display:block;image-rendering:pixelated"></div><small style="display:block;margin-top:10px;color:#4b5563;font-weight:700">{{ __('SCAN KODE TIKET') }}</small><code>{{ $ticketCode }}</code></aside>
     </div>
-    <div class="ticket-note">QR ini adalah identitas tiket booking. Petugas perlu mencocokkan kode dengan sistem ArenaSports sebelum menerima tiket.</div>
+    <div class="ticket-note">{{ __('QR ini adalah identitas tiket booking. Petugas perlu mencocokkan kode dengan sistem ArenaSports sebelum menerima tiket.') }}</div>
   </section>
 </div>
 @endsection

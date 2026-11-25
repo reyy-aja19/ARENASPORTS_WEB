@@ -57,6 +57,30 @@
 .om-badge.paid{background:#fff2d6;color:#8b5b00}
 .om-badge.level{background:#eef6ff;color:#2b5c8a}
 .om-badge.open{background:#e4f7ed;color:#167348}
+.om-badge.type{background:#eef6ff;color:#2b5c8a}
+.om-badge.status-open{background:#e4f7ed;color:#167348}
+.om-badge.status-full{background:#fff2d6;color:#8b5b00}
+.om-badge.status-done{background:#eef2f7;color:#475569}
+.om-badge.status-cancelled{background:#fde8e7;color:#a52d2d}
+.om-badge.status-draft{background:#f1f5f9;color:#64748b}
+
+.om-capacity{margin:12px 0}
+.om-capacity-head{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#526b5c;margin-bottom:6px}
+.om-capacity-head strong{color:#1c3d2d}
+.om-capacity-track{height:8px;border-radius:999px;background:#e8f0eb;overflow:hidden}
+.om-capacity-track span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#22c55e,#168653)}
+
+.om-participants{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.om-participant{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:10px;background:#f6faf7;border:1px solid #e1ece5;font-size:12px;color:#3d5a4c}
+.om-participant strong{display:block;color:#1c3d2d;font-size:13px}
+.om-participant small{color:#718078}
+.om-role{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}
+.om-role.host{background:#dcfce7;color:#166534}
+.om-role.opponent{background:#eef6ff;color:#2b5c8a}
+.om-join-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.om-join-fields input{width:100%;box-sizing:border-box;border:1px solid #d7e2da;border-radius:10px;padding:10px 11px;font:inherit}
+.om-status-note{padding:10px 12px;border-radius:10px;background:#f4f6f5;border:1px solid #e2e8e4;color:#5a6b60;font-size:12px;line-height:1.5;margin-top:10px}
+.om-section-sub{font-size:13px;color:#6b7d71;margin:8px 0 14px}
 
 .ev-flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px}
 .ev-flow div{padding:13px;border-radius:12px;background:#fff;border:1px solid #e1ebe5;font-size:11px;color:#5a7264;line-height:1.55}
@@ -85,9 +109,9 @@
 {{-- JUDUL HALAMAN --}}
 <div class="u-section-head">
     <div>
-        <h2>Open Match Komunitas</h2>
+        <h2>{{ __('Open Match Komunitas') }}</h2>
         <p>
-            Cari kawan tanding dan sparing seru yang dibuat oleh komunitas pemain ArenaSports.
+            {{ __('Cari kawan tanding dan sparing seru yang dibuat oleh komunitas pemain ArenaSports.') }}
         </p>
     </div>
 </div>
@@ -120,9 +144,9 @@
         <span style="display:flex;align-items:center;gap:14px">
             <span class="om-toggle-icon">+</span>
             <span>
-                <strong style="display:block;font-size:16px">Buat Open Match</strong>
+                <strong style="display:block;font-size:16px">{{ __('Buat Open Match') }}</strong>
                 <small style="display:block;margin-top:5px;color:#15803d">
-                    Pilih booking, atur biaya patungan, lalu publikasikan.
+                    {{ __('Pilih booking, atur biaya patungan, lalu publikasikan.') }}
                 </small>
             </span>
         </span>
@@ -190,14 +214,36 @@
 
                 <div class="om-form-grid" style="margin-top:16px">
                     <div class="full">
+                        <label>Jenis pendaftaran</label>
+                        <div class="om-mode">
+                            <label><input type="radio" name="registration_type" value="Individu" {{ old('registration_type', 'Individu') === 'Individu' ? 'checked' : '' }}> Individu</label>
+                            <label><input type="radio" name="registration_type" value="Kelompok" {{ old('registration_type') === 'Kelompok' ? 'checked' : '' }}> Kelompok</label>
+                        </div>
+                        <small id="registrationTypeHint">Individu: 1 orang = 1 slot. Kelompok: 1 kelompok = 1 slot dan wajib mengisi nama kelompok.</small>
+                    </div>
+
+                    <div class="full" id="groupHostFields" hidden>
+                        <div class="om-form-grid" style="gap:12px">
+                            <div>
+                                <label for="host_team_name">Nama kelompok / tim host</label>
+                                <input type="text" id="host_team_name" name="host_team_name" maxlength="150" value="{{ old('host_team_name') }}" placeholder="Contoh: Garuda FC">
+                            </div>
+                            <div>
+                                <label for="host_member_count">Jumlah anggota kelompok host</label>
+                                <input type="number" id="host_member_count" name="host_member_count" min="1" max="1000" value="{{ old('host_member_count', 1) }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="full">
                         <label for="title">Judul pertandingan</label>
                         <input type="text" id="title" name="title" maxlength="255" value="{{ old('title') }}" required placeholder="Contoh: Cari lawan futsal malam ini">
                     </div>
 
                     <div>
-                        <label for="jumlah_pemain">Target total pemain</label>
+                        <label for="jumlah_pemain" id="capacityLabel">Kapasitas slot pemain</label>
                         <input type="number" id="jumlah_pemain" name="jumlah_pemain" min="2" max="99" value="{{ old('jumlah_pemain', 10) }}" required>
-                        <small>Termasuk kamu sebagai host.</small>
+                        <small id="capacityHint">Termasuk kamu sebagai host.</small>
                     </div>
 
                     <div>
@@ -207,12 +253,6 @@
                                 <option value="{{ $level }}" {{ old('level') === $level ? 'selected' : '' }}>{{ $level }}</option>
                             @endforeach
                         </select>
-                    </div>
-
-                    <div class="full">
-                        <label for="contact_phone">Kontak WhatsApp host</label>
-                        <input type="text" id="contact_phone" name="contact_phone" maxlength="30" value="{{ old('contact_phone', $user?->phone) }}" placeholder="08xxxxxxxxxx">
-                        <small>Dipakai pemain untuk menghubungi host terkait match.</small>
                     </div>
 
                     <div class="full">
@@ -247,7 +287,8 @@
 </div>
 
 {{-- DAFTAR OPEN MATCH DARI PENGGUNA --}}
-<h3>Open Match dari pengguna</h3>
+<h3>{{ __('Open Match dari pengguna') }}</h3>
+<p class="om-section-sub">{{ __('Pilih match yang cocok, lalu gabung sebagai individu atau kelompok. Komunikasi hanya melalui obrolan peserta.') }}</p>
 
 <div class="u-cards">
     @forelse ($matches as $match)
@@ -256,7 +297,7 @@
             $currentUid = (int) (session('admin_user_id') ?? 0);
             $currentUserRole = session('admin_role');
             $hostUid = (int) ($match->booking?->user_id ?? 0);
-            $isParticipant = $currentUid > 0 && \Illuminate\Support\Facades\DB::table('open_match_participants')->where('open_match_id', $match->id)->where('user_id', $currentUid)->exists();
+            $isParticipant = $currentUid > 0 && $match->participants->contains(fn ($participant) => (int) $participant->id === $currentUid);
             $isCourtOwner = $currentUid > 0 && (
                 (int) ($match->booking?->lapangan?->owner_admin_id ?? 0) === $currentUid ||
                 (int) ($match->booking?->lapangan?->venue?->owner_admin_id ?? 0) === $currentUid ||
@@ -264,22 +305,26 @@
             );
             $isMatchMember = $currentUid > 0 && ($hostUid === $currentUid || $isParticipant);
             $canAccessChat = $isMatchMember || $isCourtOwner || $currentUserRole === 'superadmin';
-            $isFull = $match->status === 'Penuh' || $match->jumlah_bergabung >= $match->jumlah_pemain;
+            $isFull = $match->is_full;
+            $canJoin = $match->status === 'Open' && ! $match->has_ended && ! $isFull;
             $venueName = $match->booking?->lapangan?->venue?->name;
             $venueAddress = $match->venue_address;
             $mapEmbed = $match->maps_embed_url;
             $mapsUrl = $match->maps_url;
+            $percent = $match->jumlah_pemain > 0 ? min(100, round(($match->jumlah_bergabung / $match->jumlah_pemain) * 100)) : 0;
+            $sortedParticipants = $match->participants->sortBy(fn ($participant) => strcasecmp((string) ($participant->pivot?->role ?? ''), 'Host') === 0 ? 0 : 1);
         @endphp
 
         <article class="u-card">
             <div class="u-card-body">
 
-                <div class="u-row">
+                <div class="u-row" style="flex-wrap:wrap;gap:6px">
                     <span class="u-tag">{{ $match->jenis }}</span>
-                    <span class="u-tag gold">{{ $match->jumlah_bergabung }}/{{ $match->jumlah_pemain }}</span>
+                    <span class="om-badge type"><i class="fa-solid fa-user-group"></i> {{ $match->registration_type_label }}</span>
+                    <span class="om-badge status-{{ $match->status_tone }}"><i class="fa-solid fa-circle-info"></i> {{ $match->display_status }}</span>
                 </div>
 
-                <h3>{{ $match->title }}</h3>
+                <h3 style="margin-top:12px">{{ $match->title }}</h3>
 
                 <p class="u-meta">
                     {{ $match->tanggal?->format('d M Y') }}
@@ -295,17 +340,25 @@
                     @if($match->is_free)
                         <span class="om-badge free"><i class="fa-solid fa-gift"></i> GRATIS</span>
                     @else
-                        <span class="om-badge paid"><i class="fa-solid fa-wallet"></i> Rp {{ number_format((int) $match->biaya_per_pemain, 0, ',', '.') }} / pemain</span>
+                        <span class="om-badge paid"><i class="fa-solid fa-wallet"></i> Rp {{ number_format((int) $match->biaya_per_pemain, 0, ',', '.') }} / {{ $match->is_group ? 'kelompok' : 'pemain' }}</span>
                     @endif
                     @if($match->level)
                         <span class="om-badge level"><i class="fa-solid fa-signal"></i> {{ $match->level }}</span>
                     @endif
-                    <span class="om-badge open"><i class="fa-solid fa-users"></i> Sisa {{ max(0, (int) $match->jumlah_pemain - (int) $match->jumlah_bergabung) }} slot</span>
+                    <span class="om-badge open"><i class="fa-solid fa-users"></i> Sisa {{ $match->remaining_slots }} slot {{ $match->capacity_label }}</span>
                 </div>
 
                 @if ($match->deskripsi)
                     <p>{{ $match->deskripsi }}</p>
                 @endif
+
+                <div class="om-capacity">
+                    <div class="om-capacity-head">
+                        <strong>{{ $match->jumlah_bergabung }}/{{ $match->jumlah_pemain }} slot {{ $match->capacity_label }}</strong>
+                        <span>{{ $percent }}% terisi</span>
+                    </div>
+                    <div class="om-capacity-track"><span style="width: {{ $percent }}%"></span></div>
+                </div>
 
                 <div class="om-detail">
                     <span><i class="fa-solid fa-calendar-days"></i> {{ $match->tanggal?->format('d M Y') ?? 'Tanggal belum tersedia' }}</span>
@@ -314,29 +367,70 @@
                     <span><i class="fa-solid fa-building"></i> {{ $venueName ?: 'Venue belum terdaftar' }}</span>
                 </div>
 
+                <div style="margin-top:12px">
+                    <strong style="font-size:13px;color:#1c3d2d"><i class="fa-solid fa-users"></i> Detail Peserta</strong>
+                    <div class="om-participants">
+                        @forelse($sortedParticipants as $participant)
+                            @php $isHostRole = strcasecmp((string) ($participant->pivot?->role ?? ''), 'Host') === 0; @endphp
+                            <div class="om-participant">
+                                <div>
+                                    <strong>{{ $participant->name }}@if($isHostRole) <span style="font-weight:600;color:#718078">(Host)</span>@endif</strong>
+                                    <small>
+                                        {{ $isHostRole ? 'Pembuat match' : 'Pemain lawan' }}
+                                        @if($participant->pivot?->team_name)
+                                            · {{ $participant->pivot->team_name }}
+                                        @endif
+                                        @if($match->is_group)
+                                            · {{ (int) ($participant->pivot?->member_count ?? 1) }} anggota
+                                        @endif
+                                    </small>
+                                </div>
+                                <span class="om-role {{ $isHostRole ? 'host' : 'opponent' }}">{{ $isHostRole ? 'HOST' : 'LAWAN' }}</span>
+                            </div>
+                        @empty
+                            <div class="om-participant">
+                                <div>
+                                    <strong>{{ $match->booking?->user?->name ?? 'Pengguna ArenaSports' }}</strong>
+                                    <small>Pembuat match</small>
+                                </div>
+                                <span class="om-role host">HOST</span>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+
                 @if($isMatchMember)
-                    <button type="button" class="u-btn om-joined" disabled><i class="fa-solid fa-check"></i> Sudah Bergabung</button>
+                    <button type="button" class="u-btn om-joined" disabled><i class="fa-solid fa-check"></i> Sudah Bergabung sebagai {{ $match->is_group ? 'Kelompok' : 'Pemain' }}</button>
                 @elseif($isFull)
-                    <button type="button" class="u-btn om-full" disabled><i class="fa-solid fa-lock"></i> Pemain Sudah Penuh</button>
+                    <button type="button" class="u-btn om-full" disabled><i class="fa-solid fa-lock"></i> Slot Sudah Penuh</button>
+                @elseif(! $canJoin)
+                    <div class="om-status-note"><i class="fa-solid fa-circle-info"></i> Open Match ini berstatus <strong>{{ $match->display_status }}</strong> dan tidak dapat diikuti.</div>
                 @else
-                    <form method="POST" action="{{ route('user.openmatches.join', $match) }}">
+                    <form method="POST" action="{{ route('user.openmatches.join', $match) }}" style="margin-top:12px">
                         @csrf
-                        <button type="submit" class="u-btn"><i class="fa-solid fa-user-plus"></i> Gabung Open Match</button>
+                        @if($match->is_group)
+                            <div class="om-join-fields">
+                                <div>
+                                    <label for="team_name-{{ $match->id }}" style="display:block;font-size:12px;font-weight:700;color:#3d5a4c;margin-bottom:6px">Nama kelompok / tim</label>
+                                    <input id="team_name-{{ $match->id }}" name="team_name" maxlength="150" required value="{{ old('team_name') }}" placeholder="Contoh: Garuda FC">
+                                </div>
+                                <div>
+                                    <label for="member_count-{{ $match->id }}" style="display:block;font-size:12px;font-weight:700;color:#3d5a4c;margin-bottom:6px">Jumlah anggota</label>
+                                    <input id="member_count-{{ $match->id }}" type="number" name="member_count" min="1" max="1000" required value="{{ old('member_count', 1) }}">
+                                </div>
+                            </div>
+                        @endif
+                        <button type="submit" class="u-btn" style="width:100%"><i class="fa-solid fa-user-plus"></i> Gabung sebagai {{ $match->is_group ? 'Kelompok Lawan' : 'Pemain Lawan' }}</button>
                     </form>
                 @endif
 
                 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
                     @if ($canAccessChat)
                         <a href="{{ route('user.openmatches.chat', $match) }}" class="u-btn" style="display:inline-flex;text-decoration:none;background:#14532d">
-                            <i class="fa-solid fa-comments"></i> Obrolan Pemain
+                            <i class="fa-solid fa-comments"></i> Obrolan Peserta
                         </a>
-                    @endif
-
-                    @if($match->whatsapp_number)
-                        <a href="https://wa.me/{{ $match->whatsapp_number }}?text={{ urlencode('Halo, saya ingin bertanya tentang Open Match "' . $match->title . '" di ArenaSports.') }}"
-                           target="_blank" rel="noopener" class="u-btn" style="display:inline-flex;text-decoration:none;background:#25d366;color:#0b3d1c">
-                            <i class="fa-brands fa-whatsapp"></i> Chat Host
-                        </a>
+                    @else
+                        <div class="om-status-note" style="margin-top:0;flex:1"><i class="fa-solid fa-lock"></i> Obrolan hanya untuk host dan peserta yang sudah bergabung.</div>
                     @endif
                 </div>
 
@@ -346,7 +440,7 @@
                     <div class="om-detail">
                         <span><i class="fa-solid fa-user"></i> Host: {{ $match->booking?->user?->name ?? 'Pengguna ArenaSports' }}</span>
                         <span><i class="fa-solid fa-futbol"></i> {{ $match->jenis ?: 'Olahraga' }} · {{ $match->booking?->lapangan?->nama ?? 'Lapangan' }}</span>
-                        <span><i class="fa-solid fa-wallet"></i> {{ $match->is_free ? 'Gratis' : 'Rp ' . number_format((int) $match->biaya_per_pemain, 0, ',', '.') . ' / pemain' }}</span>
+                        <span><i class="fa-solid fa-wallet"></i> {{ $match->is_free ? 'Gratis' : 'Rp ' . number_format((int) $match->biaya_per_pemain, 0, ',', '.') . ' / ' . ($match->is_group ? 'kelompok' : 'pemain') }}</span>
                         <span><i class="fa-solid fa-signal"></i> Level: {{ $match->level ?: 'Umum' }}</span>
                     </div>
 
@@ -357,11 +451,6 @@
                                 <a href="{{ $mapsUrl }}" target="_blank" rel="noopener">
                                     <i class="fa-solid fa-map-location-dot"></i> Buka di Google Maps
                                 </a>
-                                @if($match->whatsapp_number)
-                                    <a class="wa" href="https://wa.me/{{ $match->whatsapp_number }}" target="_blank" rel="noopener">
-                                        <i class="fa-brands fa-whatsapp"></i> WhatsApp Host
-                                    </a>
-                                @endif
                             </div>
                         </div>
                     @elseif($mapsUrl)
@@ -386,6 +475,45 @@
 
     @endforelse
 </div>
+
+@if($myHistoryMatches->isNotEmpty())
+    <h3 style="margin-top:34px">Riwayat Open Match Saya</h3>
+    <p class="om-section-sub">Match yang sudah selesai, dibatalkan, atau sudah lewat jadwalnya.</p>
+    <div class="u-cards">
+        @foreach($myHistoryMatches as $match)
+            @php
+                $currentUid = (int) (session('admin_user_id') ?? 0);
+                $currentUserRole = session('admin_role');
+                $hostUid = (int) ($match->booking?->user_id ?? 0);
+                $isParticipant = $currentUid > 0 && $match->participants->contains(fn ($participant) => (int) $participant->id === $currentUid);
+                $canAccessChat = $currentUid > 0 && (
+                    $hostUid === $currentUid ||
+                    $isParticipant ||
+                    $currentUserRole === 'superadmin' ||
+                    (int) ($match->booking?->lapangan?->owner_admin_id ?? 0) === $currentUid ||
+                    (int) ($match->booking?->lapangan?->venue?->owner_admin_id ?? 0) === $currentUid
+                );
+            @endphp
+            <article class="u-card">
+                <div class="u-card-body">
+                    <div class="u-row" style="flex-wrap:wrap;gap:6px">
+                        <span class="u-tag">{{ $match->jenis }}</span>
+                        <span class="om-badge type">{{ $match->registration_type_label }}</span>
+                        <span class="om-badge status-{{ $match->status_tone }}">{{ $match->display_status }}</span>
+                    </div>
+                    <h3 style="margin-top:12px">{{ $match->title }}</h3>
+                    <p class="u-meta">{{ $match->tanggal?->format('d M Y') }} · {{ substr((string) $match->start_time, 0, 5) }}–{{ substr((string) $match->end_time, 0, 5) }}</p>
+                    <p class="u-meta">{{ $match->jumlah_bergabung }}/{{ $match->jumlah_pemain }} slot {{ $match->capacity_label }} · {{ $match->booking?->lapangan?->nama ?? 'Lapangan' }}</p>
+                    @if($canAccessChat)
+                        <a href="{{ route('user.openmatches.chat', $match) }}" class="u-btn" style="display:inline-flex;text-decoration:none;background:#14532d;margin-top:8px">
+                            <i class="fa-solid fa-comments"></i> Obrolan Peserta
+                        </a>
+                    @endif
+                </div>
+            </article>
+        @endforeach
+    </div>
+@endif
 
 {{-- EVENT RESMI VENUE ADMIN --}}
 <div class="u-section-head" style="margin-top:42px; margin-bottom:16px;">
@@ -414,22 +542,28 @@
             $eventMapEmbed = $event->maps_embed_url;
             $eventMapsUrl = $event->maps_url;
             $registration = $eventRegistrations[$event->id] ?? null;
-            $isClosed = ($event->registration_deadline && $event->registration_deadline->lt(today()))
-                || ((int) $event->kuota > 0 && $event->registrations()->count() >= (int) $event->kuota);
+            $registrationCount = $event->registration_count;
+            $quotaPercent = $event->kuota > 0 ? min(100, round(($registrationCount / $event->kuota) * 100)) : 0;
+            $isClosed = ! $event->is_registration_open;
+            $quotaUnit = $event->quota_unit;
         @endphp
         <article class="u-card" style="border-top: 4px solid #168653; display:flex; flex-direction:column; justify-content:space-between;">
             <div class="u-card-body">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:10px; flex-wrap:wrap">
                     <span class="u-tag" style="background:#e8f7ec; color:#146c43; font-weight:800; border:1px solid #c3e6cb; font-size:11px;">
                         <i class="fa-solid fa-shield-halved"></i> Event Resmi
                     </span>
-                    <span class="u-tag">{{ $event->jenis }}</span>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <span class="u-tag">{{ $event->jenis }}</span>
+                        <span class="om-badge type"><i class="fa-solid fa-user-group"></i> {{ $event->registration_type_label }}</span>
+                        <span class="om-badge status-{{ $event->status_tone }}"><i class="fa-solid fa-circle-info"></i> {{ $event->display_status }}</span>
+                    </div>
                 </div>
 
                 <h3 style="font-size:17px; margin-bottom:12px; color:#143e26;">{{ $event->title }}</h3>
 
                 <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-                    <span class="om-badge free"><i class="fa-solid fa-ticket"></i> {{ (int) $event->registration_fee > 0 ? 'Rp ' . number_format((int) $event->registration_fee, 0, ',', '.') . ' / tim' : 'GRATIS' }}</span>
+                    <span class="om-badge free"><i class="fa-solid fa-ticket"></i> {{ (int) $event->registration_fee > 0 ? 'Rp ' . number_format((int) $event->registration_fee, 0, ',', '.') . ' / ' . $quotaUnit : 'GRATIS' }}</span>
                     @if($event->prize)
                         <span class="om-badge paid"><i class="fa-solid fa-trophy"></i> Hadiah: {{ $event->prize }}</span>
                     @endif
@@ -456,8 +590,8 @@
                     <span>
                         <i class="fa-solid fa-users"></i>
                         <div>
-                            <strong>Kuota</strong><br>
-                            <small style="color:#718078;">{{ $event->kuota }} peserta · {{ $event->registrations()->count() }} terdaftar</small>
+                            <strong>Kuota {{ $quotaUnit }}</strong><br>
+                            <small style="color:#718078;">{{ $registrationCount }}/{{ $event->kuota }} {{ $quotaUnit }} terdaftar</small>
                         </div>
                     </span>
                     <span>
@@ -469,6 +603,14 @@
                     </span>
                 </div>
 
+                <div class="om-capacity">
+                    <div class="om-capacity-head">
+                        <strong>{{ $registrationCount }}/{{ $event->kuota }} {{ $quotaUnit }}</strong>
+                        <span>{{ $quotaPercent }}% terisi</span>
+                    </div>
+                    <div class="om-capacity-track"><span style="width: {{ $quotaPercent }}%"></span></div>
+                </div>
+
                 @if ($event->deskripsi)
                     <div style="background:#f8faf9; padding:12px 14px; border-radius:10px; font-size:12px; color:#4a5c52; line-height:1.6; margin-bottom:14px; border-left:3px solid #168653;">
                         {{ $event->deskripsi }}
@@ -476,7 +618,7 @@
                 @endif
 
                 <details class="om-more">
-                    <summary>Detail & Peta Lokasi</summary>
+                    <summary>Detail, Peta & Peserta Terdaftar</summary>
                     @if($eventMapEmbed)
                         <div class="om-map">
                             <iframe src="{{ $eventMapEmbed }}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
@@ -492,13 +634,36 @@
                         </div>
                     @endif
 
+                    <div style="margin-top:14px">
+                        <strong style="font-size:13px;color:#1c3d2d"><i class="fa-solid fa-clipboard-list"></i> Peserta Terdaftar ({{ $registrationCount }})</strong>
+                        <div class="om-participants">
+                            @forelse($event->registrations as $registered)
+                                <div class="om-participant">
+                                    <div>
+                                        <strong>{{ $registered->display_name }}@if($registered->is_individual) <span style="font-weight:600;color:#718078">(Individu)</span>@endif</strong>
+                                        <small>
+                                            @if($registered->is_individual)
+                                                Pendaftar individu
+                                            @else
+                                                Tim · {{ (int) $registered->member_count }} anggota
+                                            @endif
+                                        </small>
+                                    </div>
+                                    <span class="om-role {{ in_array($registered->status, ['Terkonfirmasi', 'Dihubungi'], true) ? 'host' : 'opponent' }}">{{ strtoupper($registered->status) }}</span>
+                                </div>
+                            @empty
+                                <p class="u-meta" style="margin:0">Belum ada peserta yang terdaftar.</p>
+                            @endforelse
+                        </div>
+                    </div>
+
                     @if($registration)
                         <div class="ev-registered" style="margin-top:14px">
-                            <strong><i class="fa-solid fa-circle-check"></i> Tim {{ $registration->team_name }} sudah terdaftar</strong>
-                            Status: {{ $registration->status }} · {{ $registration->member_count }} anggota
+                            <strong><i class="fa-solid fa-circle-check"></i> {{ $registration->is_individual ? 'Pendaftaran' : 'Tim' }} {{ $registration->display_name }} sudah terdaftar</strong>
+                            Status: {{ $registration->status }} · {{ $registration->is_individual ? 'Peserta individu' : $registration->member_count . ' anggota' }}
                             <br>
                             @if($event->whatsapp_number)
-                                <a href="https://wa.me/{{ $event->whatsapp_number }}?text={{ urlencode('Halo, saya ketua tim ' . $registration->team_name . ' yang mendaftar event "' . $event->title . '". Mohon informasi teknis selanjutnya.') }}"
+                                <a href="https://wa.me/{{ $event->whatsapp_number }}?text={{ urlencode('Halo, saya ' . $registration->captain_name . ' yang mendaftar event "' . $event->title . '". Mohon informasi teknis selanjutnya.') }}"
                                    target="_blank" rel="noopener"
                                    style="display:inline-flex;align-items:center;gap:6px;margin-top:9px;padding:8px 12px;border-radius:9px;background:#25d366;color:#0b3d1c;font-size:12px;font-weight:800;text-decoration:none">
                                     <i class="fa-brands fa-whatsapp"></i> Hubungi Penyelenggara
@@ -507,45 +672,49 @@
                         </div>
                     @elseif($isClosed)
                         <div class="ev-registered" style="margin-top:14px;background:#fdeceb;border-color:#f5c9c6;color:#8f2020">
-                            <strong><i class="fa-solid fa-lock"></i> Pendaftaran ditutup</strong>
-                            Kuota penuh atau batas pendaftaran sudah lewat.
+                            <strong><i class="fa-solid fa-lock"></i> Pendaftaran {{ $event->display_status === 'Segera Dibuka' ? 'belum dibuka' : 'ditutup' }}</strong>
+                            {{ $event->display_status === 'Segera Dibuka' ? 'Event ini akan segera dibuka untuk pendaftaran.' : 'Kuota penuh, event selesai, atau batas pendaftaran sudah lewat.' }}
                         </div>
                     @else
                         <form method="POST" action="{{ route('user.events.register', $event) }}" class="ev-form">
                             @csrf
+                            @if(! $event->is_individual)
+                                <div>
+                                    <label for="team_name-{{ $event->id }}">Nama tim</label>
+                                    <input id="team_name-{{ $event->id }}" name="team_name" maxlength="150" required value="{{ old('team_name') }}" placeholder="Contoh: Garuda FC">
+                                </div>
+                            @endif
                             <div>
-                                <label for="team_name-{{ $event->id }}">Nama tim</label>
-                                <input id="team_name-{{ $event->id }}" name="team_name" maxlength="150" required value="{{ old('team_name') }}" placeholder="Contoh: Garuda FC">
-                            </div>
-                            <div>
-                                <label for="captain_name-{{ $event->id }}">Nama ketua tim</label>
+                                <label for="captain_name-{{ $event->id }}">{{ $event->is_individual ? 'Nama peserta' : 'Nama ketua tim' }}</label>
                                 <input id="captain_name-{{ $event->id }}" name="captain_name" maxlength="150" required value="{{ old('captain_name', $user?->name) }}">
                             </div>
                             <div>
-                                <label for="captain_phone-{{ $event->id }}">WhatsApp ketua</label>
+                                <label for="captain_phone-{{ $event->id }}">WhatsApp {{ $event->is_individual ? 'peserta' : 'ketua' }}</label>
                                 <input id="captain_phone-{{ $event->id }}" name="captain_phone" maxlength="30" required value="{{ old('captain_phone', $user?->phone) }}" placeholder="08xxxxxxxxxx">
                             </div>
-                            <div>
-                                <label for="member_count-{{ $event->id }}">Jumlah anggota</label>
-                                <input id="member_count-{{ $event->id }}" type="number" name="member_count" min="1" max="1000" required value="{{ old('member_count', 5) }}">
-                            </div>
+                            @if(! $event->is_individual)
+                                <div>
+                                    <label for="member_count-{{ $event->id }}">Jumlah anggota</label>
+                                    <input id="member_count-{{ $event->id }}" type="number" name="member_count" min="1" max="1000" required value="{{ old('member_count', 5) }}">
+                                </div>
+                            @endif
                             <div class="full">
                                 <label for="notes-{{ $event->id }}">Catatan (opsional)</label>
-                                <textarea id="notes-{{ $event->id }}" name="notes" maxlength="2000" placeholder="Kebutuhan khusus, nama anggota, dll.">{{ old('notes') }}</textarea>
+                                <textarea id="notes-{{ $event->id }}" name="notes" maxlength="2000" placeholder="{{ $event->is_individual ? 'Kebutuhan khusus atau informasi tambahan.' : 'Kebutuhan khusus, nama anggota, dll.' }}">{{ old('notes') }}</textarea>
                             </div>
                             <label class="ev-check full" for="agree-{{ $event->id }}">
                                 <input id="agree-{{ $event->id }}" type="checkbox" name="agree" value="1" required {{ old('agree') ? 'checked' : '' }}>
-                                <span>Saya menyetujui data tim dibagikan ke penyelenggara dan akan melanjutkan konfirmasi via WhatsApp.</span>
+                                <span>Saya menyetujui data {{ $event->is_individual ? 'peserta' : 'tim' }} dibagikan ke penyelenggara dan akan melanjutkan konfirmasi via WhatsApp.</span>
                             </label>
                             <button type="submit" class="u-btn full" style="width:100%">
-                                <i class="fa-solid fa-paper-plane"></i> Daftarkan Tim
+                                <i class="fa-solid fa-paper-plane"></i> {{ $event->is_individual ? 'Daftar sebagai Peserta' : 'Daftarkan Tim' }}
                             </button>
                         </form>
                     @endif
                 </details>
             </div>
 
-            <div style="padding:14px 18px; background:#fbfdfc; border-top:1px solid #edf4f0; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <div style="padding:14px 18px; background:#fbfdfc; border-top:1px solid #edf4f0; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap">
                 <span style="font-size:11px; color:#62796e;">
                     <i class="fa-solid fa-circle-check" style="color:#168653;"></i> Pendaftaran tercatat & lanjut WhatsApp
                 </span>
@@ -591,9 +760,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const preview = document.getElementById('bookingPreview');
     const playersInput = document.getElementById('jumlah_pemain');
     const modeRadios = document.querySelectorAll('input[name="biaya_mode"]');
+    const registrationTypeRadios = document.querySelectorAll('input[name="registration_type"]');
     const costInput = document.getElementById('costInput');
     const costField = document.getElementById('biaya_per_pemain');
     const costHint = document.getElementById('costHint');
+    const groupHostFields = document.getElementById('groupHostFields');
+    const hostTeamName = document.getElementById('host_team_name');
+    const hostMemberCount = document.getElementById('host_member_count');
+    const capacityLabel = document.getElementById('capacityLabel');
+    const capacityHint = document.getElementById('capacityHint');
+    const registrationTypeHint = document.getElementById('registrationTypeHint');
 
     let bookingTotal = 0;
 
@@ -642,13 +818,15 @@ document.addEventListener('DOMContentLoaded', function () {
         const players = Math.max(1, Number(playersInput?.value || 1));
         const suggestion = bookingTotal > 0 ? Math.ceil(bookingTotal / players) : 0;
 
+        const type = document.querySelector('input[name="registration_type"]:checked')?.value || 'Individu';
+        const unit = type === 'Kelompok' ? 'kelompok' : 'pemain';
         if (suggestion > 0) {
             costField.placeholder = String(suggestion);
             if (!costField.value) {
                 costField.value = String(suggestion);
             }
             if (costHint) {
-                costHint.textContent = 'Saran otomatis: ' + formatRupiah(suggestion) + ' / pemain (' + formatRupiah(bookingTotal) + ' ÷ ' + players + ' pemain). Bisa diubah.';
+                costHint.textContent = 'Saran otomatis: ' + formatRupiah(suggestion) + ' / ' + unit + ' (' + formatRupiah(bookingTotal) + ' ÷ ' + players + ' slot). Bisa diubah.';
             }
         } else if (costHint) {
             costHint.textContent = 'Masukkan nominal patungan per pemain.';
@@ -668,12 +846,39 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function updateRegistrationType() {
+        const type = document.querySelector('input[name="registration_type"]:checked')?.value || 'Individu';
+        const isGroup = type === 'Kelompok';
+
+        if (groupHostFields) groupHostFields.hidden = !isGroup;
+        if (hostTeamName) hostTeamName.required = isGroup;
+        if (hostMemberCount) hostMemberCount.required = isGroup;
+
+        if (capacityLabel) capacityLabel.textContent = isGroup ? 'Kapasitas slot kelompok' : 'Kapasitas slot pemain';
+        if (capacityHint) capacityHint.textContent = isGroup
+            ? 'Termasuk kelompok host. 1 kelompok = 1 slot.'
+            : 'Termasuk kamu sebagai host. 1 orang = 1 slot.';
+        if (registrationTypeHint) registrationTypeHint.textContent = isGroup
+            ? 'Kelompok: 1 kelompok = 1 slot. Peserta lawan akan mengisi nama kelompok dan jumlah anggota saat bergabung.'
+            : 'Individu: 1 orang = 1 slot. Peserta lawan bergabung sebagai pemain individu.';
+
+        if (costHint) {
+            const players = Math.max(1, Number(playersInput?.value || 1));
+            const suggestion = bookingTotal > 0 ? Math.ceil(bookingTotal / players) : 0;
+            if (costHint.textContent.includes('Saran otomatis') && suggestion > 0) {
+                costHint.textContent = 'Saran otomatis: ' + formatRupiah(suggestion) + ' / ' + (isGroup ? 'kelompok' : 'pemain') + ' (' + formatRupiah(bookingTotal) + ' ÷ ' + players + ' slot). Bisa diubah.';
+            }
+        }
+    }
+
     if (bookingSelect) bookingSelect.addEventListener('change', updatePreview);
-    if (playersInput) playersInput.addEventListener('input', updateSuggestion);
+    if (playersInput) playersInput.addEventListener('input', function () { updateSuggestion(); updateRegistrationType(); });
     modeRadios.forEach(radio => radio.addEventListener('change', updateMode));
+    registrationTypeRadios.forEach(radio => radio.addEventListener('change', updateRegistrationType));
 
     updatePreview();
     updateMode();
+    updateRegistrationType();
 
     const waLink = document.getElementById('eventWaLink');
     if (waLink) {

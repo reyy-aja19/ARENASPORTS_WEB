@@ -1,6 +1,17 @@
 @extends('layouts.admin', ['title' => 'Edit Reward', 'heading' => 'Edit Reward'])
 
 @section('content')
+@if($errors->any())
+    <div class="flash flash-error" style="margin-bottom:14px;">
+        <strong>Gagal memperbarui reward:</strong>
+        <ul style="margin:8px 0 0 18px;">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
 <form class="form-card" action="{{ route('admin.rewards.update', $reward) }}" method="POST" enctype="multipart/form-data">
     @csrf
     @method('PUT')
@@ -25,6 +36,16 @@
                     <option value="{{ $status }}" {{ old('status', $reward->status) === $status ? 'selected' : '' }}>{{ $status }}</option>
                 @endforeach
             </select>
+        </div>
+        <div class="form-group" style="grid-column:1 / -1;">
+            <label>Berlaku di Venue</label>
+            <select class="select-ui" name="venue_id">
+                <option value="">Global / Semua venue</option>
+                @foreach(($venues ?? collect()) as $venue)
+                    <option value="{{ $venue->id }}" @selected((string) old('venue_id', $reward->venue_id) === (string) $venue->id)>{{ $venue->name }}</option>
+                @endforeach
+            </select>
+            <small class="muted">Pilih venue jika reward ini hanya dapat diverifikasi/digunakan di venue tertentu.</small>
         </div>
     </div>
 

@@ -322,7 +322,7 @@ class BaseApiController extends Controller
 
     protected function matchPayload(OpenMatch $match, ?User $user = null): array
     {
-        $match->loadMissing('booking.lapangan.venue', 'booking.user');
+        $match->loadMissing('booking.lapangan.venue', 'booking.user', 'participants');
 
         $booking = $match->booking;
         $court = $booking?->lapangan;
@@ -345,13 +345,19 @@ class BaseApiController extends Controller
             'booking_id' => $match->booking_id ? (int) $match->booking_id : null,
             'title' => $match->title,
             'jenis' => $match->jenis,
+            'registration_type' => $match->registration_type_label,
             'tanggal' => $match->tanggal?->toDateString(),
             'start_time' => substr((string) $match->start_time, 0, 5),
             'end_time' => substr((string) $match->end_time, 0, 5),
             'jumlah_pemain' => (int) $match->jumlah_pemain,
             'jumlah_bergabung' => (int) $match->jumlah_bergabung,
+            'capacity' => (int) $match->jumlah_pemain,
+            'capacity_unit' => $match->capacity_label,
+            'remaining_slots' => $match->remaining_slots,
             'deskripsi' => $match->deskripsi,
             'status' => $match->status,
+            'status_label' => $match->display_status,
+            'status_tone' => $match->status_tone,
             'event_type' => 'open_match',
             'organizer' => $booking?->user?->name,
             'field_id' => $court?->id,
@@ -362,8 +368,16 @@ class BaseApiController extends Controller
             'venue_longitude' => $venue?->longitude,
             'google_maps_url' => $match->maps_url,
             'google_maps_embed_url' => $match->maps_embed_url,
-            'contact_phone' => $match->contact_phone,
-            'contact_whatsapp' => $match->whatsapp_number,
+            'contact_phone' => null,
+            'contact_whatsapp' => null,
+            'participants' => $match->participants->map(fn ($participant) => [
+                'id' => (int) $participant->id,
+                'name' => $participant->name,
+                'role' => $participant->pivot?->role ?: 'Lawan',
+                'is_host' => strcasecmp((string) ($participant->pivot?->role), 'Host') === 0,
+                'team_name' => $participant->pivot?->team_name,
+                'member_count' => (int) ($participant->pivot?->member_count ?? 1),
+            ])->values()->all(),
             'level' => $match->level,
             'biaya_per_pemain' => $match->biaya_per_pemain !== null ? (int) $match->biaya_per_pemain : null,
             'is_free' => $match->is_free,
@@ -374,7 +388,7 @@ class BaseApiController extends Controller
             'prize' => null,
             'joined' => $joined,
             'is_host' => $isHost,
-            'is_full' => (int) $match->jumlah_bergabung >= (int) $match->jumlah_pemain,
+            'is_full' => $match->is_full,
             'chat_available' => $joined,
             'has_ended' => $match->has_ended,
         ];
@@ -382,7 +396,7 @@ class BaseApiController extends Controller
 
     protected function eventPayload(Event $event, ?User $user = null): array
     {
-        $event->loadMissing('creator.venues', 'venue', 'registrations');
+        $event->loadMissing('creator.venues', 'venue', 'registrations.user');
 
         $venue = $event->venue ?: $event->creator?->venues?->first();
         $registrationCount = $event->registrations->count();
@@ -395,13 +409,19 @@ class BaseApiController extends Controller
             'booking_id' => null,
             'title' => $event->title,
             'jenis' => $event->jenis,
+            'registration_type' => $event->registration_type_label,
             'tanggal' => $event->tanggal?->toDateString(),
             'start_time' => substr((string) $event->start_time, 0, 5),
             'end_time' => substr((string) $event->end_time, 0, 5),
             'jumlah_pemain' => (int) $event->kuota,
             'jumlah_bergabung' => $registrationCount,
+            'capacity' => (int) $event->kuota,
+            'capacity_unit' => $event->quota_unit,
+            'remaining_quota' => $event->remaining_quota,
             'deskripsi' => $event->deskripsi,
             'status' => $event->status,
+            'status_label' => $event->display_status,
+            'status_tone' => $event->status_tone,
             'event_type' => 'tournament',
             'organizer' => $event->creator?->name,
             'field_id' => null,
@@ -418,11 +438,21 @@ class BaseApiController extends Controller
             'registration_fee' => (int) ($event->registration_fee ?? 0),
             'prize' => $event->prize,
             'registration_deadline' => $event->registration_deadline?->toDateString(),
+            'registrations' => $event->registrations->map(fn ($registration) => [
+                'id' => (int) $registration->id,
+                'display_name' => $registration->display_name,
+                'registration_type' => $registration->registration_type,
+                'member_count' => (int) $registration->member_count,
+                'status' => $registration->status,
+                'is_mine' => $user ? (int) $registration->user_id === (int) $user->id : false,
+            ])->values()->all(),
             'is_registered' => $userRegistration !== null,
             'registration_status' => $userRegistration?->status,
             'registration' => $userRegistration ? [
                 'id' => (int) $userRegistration->id,
+                'registration_type' => $userRegistration->registration_type,
                 'team_name' => $userRegistration->team_name,
+                'display_name' => $userRegistration->display_name,
                 'captain_name' => $userRegistration->captain_name,
                 'captain_phone' => $userRegistration->captain_phone,
                 'member_count' => (int) $userRegistration->member_count,
@@ -430,7 +460,7 @@ class BaseApiController extends Controller
             ] : null,
             'joined' => $userRegistration !== null,
             'is_host' => false,
-            'is_full' => (int) $event->kuota > 0 && $registrationCount >= (int) $event->kuota,
+            'is_full' => $event->is_full,
             'chat_available' => false,
         ];
     }

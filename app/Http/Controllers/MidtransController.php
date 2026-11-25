@@ -333,6 +333,17 @@ class MidtransController extends Controller
         }
     }
 
+    private function redirectToReceipt(Payment $payment, ?string $message = null): RedirectResponse
+    {
+        $payment->loadMissing('booking');
+
+        $redirect = $payment->booking
+            ? redirect()->route('user.bookings.ticket', $payment->booking)
+            : redirect()->route('user.payments.success', $payment);
+
+        return $message ? $redirect->with('success', $message) : $redirect;
+    }
+
     /**
      * HALAMAN PEMBAYARAN SNAP.JS (TETAP DI WEBSITE)
      */
@@ -348,7 +359,7 @@ class MidtransController extends Controller
         ]);
 
         if ($this->paymentIsPaid($payment)) {
-            return redirect()->route('user.payments.success', $payment);
+            return $this->redirectToReceipt($payment);
         }
 
         if (!$payment->snap_token) {
@@ -376,7 +387,51 @@ class MidtransController extends Controller
                 'services.midtrans.is_production'
             ),
             'statusUrl' => route('user.payments.status', $payment),
+            'statusJsonUrl' => route('user.payments.status-json', $payment),
             'successUrl' => route('user.payments.success', $payment),
+        ]);
+    }
+
+    /**
+     * SINKRONISASI MANUAL OLEH ADMIN/SUPERADMIN.
+     */
+    public function syncForAdmin(Payment $payment): Payment
+    {
+        $payment->refresh();
+
+        if (strtolower((string) $payment->method) !== 'midtrans') {
+            return $payment;
+        }
+
+        $this->refreshPaymentFromMidtrans($payment);
+        $payment->refresh();
+
+        return $payment;
+    }
+
+    /**
+     * STATUS JSON UNTUK POLLING WEB.
+     */
+    public function paymentStatusJson(Request $request, Payment $payment): JsonResponse
+    {
+        $this->authorizePayment($request, $payment);
+
+        if (! $this->paymentIsPaid($payment)) {
+            $this->refreshPaymentFromMidtrans($payment);
+            $payment->refresh();
+        }
+
+        $payment->loadMissing('booking');
+
+        return response()->json([
+            'ok' => true,
+            'paid' => $this->paymentIsPaid($payment),
+            'status' => $payment->status,
+            'redirect_url' => $this->paymentIsPaid($payment)
+                ? ($payment->booking
+                    ? route('user.bookings.ticket', $payment->booking)
+                    : route('user.payments.success', $payment))
+                : null,
         ]);
     }
 
@@ -390,16 +445,14 @@ class MidtransController extends Controller
         $this->authorizePayment($request, $payment);
 
         if ($this->paymentIsPaid($payment)) {
-            return redirect()->route('user.payments.success', $payment);
+            return $this->redirectToReceipt($payment, 'Pembayaran berhasil diterima.');
         }
 
         $this->refreshPaymentFromMidtrans($payment);
         $payment->refresh();
 
         if ($this->paymentIsPaid($payment)) {
-            return redirect()
-                ->route('user.payments.success', $payment)
-                ->with('success', 'Pembayaran berhasil diterima.');
+            return $this->redirectToReceipt($payment, 'Pembayaran berhasil diterima.');
         }
 
         if (strtolower((string) $payment->status) === 'menunggu') {
@@ -440,6 +493,11 @@ class MidtransController extends Controller
                     'error',
                     'Pembayaran belum selesai. Status masih menunggu.'
                 );
+        }
+
+        if ($payment->booking) {
+            return redirect()->route('user.bookings.ticket', $payment->booking)
+                ->with('success', 'Pembayaran berhasil. Bukti pembayaran siap ditampilkan.');
         }
 
         return view('user.payment-success', [

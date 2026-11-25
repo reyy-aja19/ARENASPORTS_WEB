@@ -7,6 +7,7 @@ use App\Models\Event;
 use App\Models\EventRegistration;
 use App\Models\OpenMatch;
 use App\Models\OpenMatchMessage;
+use App\Models\OpenMatchParticipant;
 use App\Notifications\ArenaUserNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -76,6 +77,9 @@ class OpenMatchController extends BaseApiController
         $data = $request->validate([
             'booking_id' => ['required', 'integer', 'exists:bookings,id'],
             'title' => ['required', 'string', 'max:255'],
+            'registration_type' => ['nullable', 'in:Individu,Kelompok'],
+            'host_team_name' => ['nullable', 'required_if:registration_type,Kelompok', 'string', 'max:150'],
+            'host_member_count' => ['nullable', 'required_if:registration_type,Kelompok', 'integer', 'min:1', 'max:1000'],
             'jumlah_pemain' => ['required', 'integer', 'min:2', 'max:99'],
             'biaya_mode' => ['nullable', 'in:Gratis,Patungan'],
             'biaya_per_pemain' => ['nullable', 'integer', 'min:0', 'max:10000000'],
@@ -83,6 +87,8 @@ class OpenMatchController extends BaseApiController
             'contact_phone' => ['nullable', 'string', 'max:30'],
             'deskripsi' => ['nullable', 'string', 'max:1500'],
         ]);
+
+        $registrationType = $data['registration_type'] ?? OpenMatch::REGISTRATION_INDIVIDU;
 
         $booking = Booking::with('lapangan.venue')
             ->where('id', $data['booking_id'])
@@ -117,6 +123,7 @@ class OpenMatchController extends BaseApiController
             'booking_id' => $booking->id,
             'title' => $data['title'],
             'jenis' => $booking->lapangan?->jenis ?? 'Futsal',
+            'registration_type' => $registrationType,
             'tanggal' => $booking->booking_date,
             'start_time' => $booking->start_time,
             'end_time' => $booking->end_time,
@@ -129,9 +136,16 @@ class OpenMatchController extends BaseApiController
             'status' => 'Open',
         ]);
 
-        DB::table('open_match_participants')->insertOrIgnore([
+        OpenMatchParticipant::insertOrIgnore([
             'open_match_id' => $match->id,
             'user_id' => $user->id,
+            'role' => 'Host',
+            'team_name' => $registrationType === OpenMatch::REGISTRATION_KELOMPOK
+                ? ($data['host_team_name'] ?? null)
+                : null,
+            'member_count' => $registrationType === OpenMatch::REGISTRATION_KELOMPOK
+                ? (int) ($data['host_member_count'] ?? 1)
+                : 1,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -153,6 +167,11 @@ class OpenMatchController extends BaseApiController
     {
         $user = $this->currentUser($request);
 
+        $data = $request->validate([
+            'team_name' => [$openMatch->is_group ? 'required' : 'nullable', 'string', 'max:150'],
+            'member_count' => [$openMatch->is_group ? 'required' : 'nullable', 'integer', 'min:1', 'max:1000'],
+        ]);
+
         $matchStart = $openMatch->tanggal && $openMatch->start_time
             ? Carbon::parse($openMatch->tanggal->toDateString().' '.$openMatch->start_time)
             : null;
@@ -161,7 +180,7 @@ class OpenMatchController extends BaseApiController
             return $this->fail('Open Match sudah tidak tersedia.', 422);
         }
 
-        $result = DB::transaction(function () use ($openMatch, $user) {
+        $result = DB::transaction(function () use ($openMatch, $user, $data) {
             $match = OpenMatch::whereKey($openMatch->id)->lockForUpdate()->firstOrFail();
 
             if ($match->status !== 'Open' || $match->jumlah_bergabung >= $match->jumlah_pemain) {
@@ -177,9 +196,12 @@ class OpenMatchController extends BaseApiController
                 return 'joined';
             }
 
-            DB::table('open_match_participants')->insert([
+            OpenMatchParticipant::insertOrIgnore([
                 'open_match_id' => $match->id,
                 'user_id' => $user->id,
+                'role' => 'Lawan',
+                'team_name' => $match->is_group ? ($data['team_name'] ?? null) : null,
+                'member_count' => $match->is_group ? (int) ($data['member_count'] ?? 1) : 1,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -209,7 +231,7 @@ class OpenMatchController extends BaseApiController
         }
 
         if ($result === 'full') {
-            return $this->fail('Slot pemain sudah penuh.', 422);
+            return $this->fail('Slot '.$openMatch->capacity_label.' sudah penuh.', 422);
         }
 
         $openMatch->refresh()->load('booking.lapangan.venue');
@@ -290,11 +312,13 @@ class OpenMatchController extends BaseApiController
     {
         $user = $this->currentUser($request);
 
+        $isTeam = ! $event->is_individual;
+
         $data = $request->validate([
-            'team_name' => ['required', 'string', 'max:150'],
+            'team_name' => [$isTeam ? 'required' : 'nullable', 'string', 'max:150'],
             'captain_name' => ['required', 'string', 'max:150'],
             'captain_phone' => ['required', 'string', 'max:30'],
-            'member_count' => ['required', 'integer', 'min:1', 'max:1000'],
+            'member_count' => [$isTeam ? 'required' : 'nullable', 'integer', 'min:1', 'max:1000'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -311,59 +335,69 @@ class OpenMatchController extends BaseApiController
         }
 
         if ((int) $event->kuota > 0 && $event->registrations->count() >= (int) $event->kuota) {
-            return $this->fail('Kuota tim untuk event ini sudah penuh.', 422);
+            return $this->fail('Kuota '.$event->quota_unit.' untuk event ini sudah penuh.', 422);
         }
 
         $alreadyRegistered = $event->registrations->firstWhere('user_id', $user->id);
         if ($alreadyRegistered) {
-            return $this->fail('Kamu sudah mendaftarkan tim untuk event ini.', 422);
+            return $this->fail('Kamu sudah mendaftar untuk event ini.', 422);
         }
+
+        $participantName = $isTeam ? $data['team_name'] : $data['captain_name'];
 
         $registration = EventRegistration::create([
             'event_id' => $event->id,
             'user_id' => $user->id,
-            'team_name' => $data['team_name'],
+            'registration_type' => $event->registration_type,
+            'team_name' => $participantName,
             'captain_name' => $data['captain_name'],
             'captain_phone' => $data['captain_phone'],
-            'member_count' => $data['member_count'],
+            'member_count' => $isTeam ? (int) $data['member_count'] : 1,
             'notes' => $data['notes'] ?? null,
             'status' => 'Baru',
         ]);
 
         $organizerName = $event->creator?->name ?? 'Penyelenggara';
         $phone = $event->whatsapp_number;
-        $message = "Halo {$organizerName}, saya {$registration->captain_name} dari tim "
-            ."{$registration->team_name}. Saya ingin mendaftar event \"{$event->title}\" "
-            ."({$event->jenis}) pada ".optional($event->tanggal)->format('d M Y').'. '
-            ."Jumlah anggota: {$registration->member_count} orang. "
-            .($registration->notes ? "Catatan: {$registration->notes}. " : '')
-            .'Mohon informasi teknis, kelengkapan, dan pembayaran selanjutnya. Terima kasih.';
+        $message = $isTeam
+            ? "Halo {$organizerName}, saya {$registration->captain_name} dari tim "
+                ."{$registration->team_name}. Saya ingin mendaftar event \"{$event->title}\" "
+                ."({$event->jenis}) pada ".optional($event->tanggal)->format('d M Y').'. '
+                ."Jumlah anggota: {$registration->member_count} orang. "
+                .($registration->notes ? "Catatan: {$registration->notes}. " : '')
+                .'Mohon informasi teknis, kelengkapan, dan pembayaran selanjutnya. Terima kasih.'
+            : "Halo {$organizerName}, saya {$registration->captain_name}. Saya ingin mendaftar sebagai peserta "
+                ."event \"{$event->title}\" ({$event->jenis}) pada ".optional($event->tanggal)->format('d M Y').'. '
+                .($registration->notes ? "Catatan: {$registration->notes}. " : '')
+                .'Mohon informasi teknis, kelengkapan, dan pembayaran selanjutnya. Terima kasih.';
         $waUrl = $phone
             ? 'https://wa.me/'.$phone.'?text='.urlencode($message)
             : null;
 
         if ($event->creator) {
             $event->creator->notify(new ArenaUserNotification(
-                'Pendaftaran Tim Baru',
-                'Tim '.$registration->team_name.' mendaftar event '.$event->title.'.',
+                $isTeam ? 'Pendaftaran Tim Baru' : 'Pendaftaran Peserta Baru',
+                ($isTeam ? 'Tim ' : 'Peserta ').$registration->display_name.' mendaftar event '.$event->title.'.',
                 route('admin.events.registrations', $event, false)
             ));
         }
 
-        $event->load('registrations');
+        $event->load('registrations.user');
 
         return $this->ok([
             'event' => $this->eventPayload($event, $user),
             'registration' => [
                 'id' => (int) $registration->id,
+                'registration_type' => $registration->registration_type,
                 'team_name' => $registration->team_name,
+                'display_name' => $registration->display_name,
                 'captain_name' => $registration->captain_name,
                 'captain_phone' => $registration->captain_phone,
                 'member_count' => (int) $registration->member_count,
                 'status' => $registration->status,
             ],
             'whatsapp_url' => $waUrl,
-        ], 'Pendaftaran tim berhasil disimpan. Lanjutkan konfirmasi ke WhatsApp penyelenggara.', 201);
+        ], 'Pendaftaran berhasil disimpan. Lanjutkan konfirmasi ke WhatsApp penyelenggara.', 201);
     }
 
     private function messagePayload(OpenMatchMessage $message): array

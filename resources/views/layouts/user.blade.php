@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="id">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -46,36 +46,36 @@
 
         <a class="{{ request()->routeIs('user.venues*') ? 'active' : '' }}"
            href="{{ route('user.venues') }}">
-            Cari Venue
+            {{ __('Cari Venue') }}
         </a>
 
         <a class="{{ request()->routeIs('user.courts*', 'courts.detail') ? 'active' : '' }}"
            href="{{ route('user.courts') }}">
-            Cari Lapangan
+            {{ __('Cari Lapangan') }}
         </a>
 
         <a class="{{ request()->routeIs('user.openmatches*') ? 'active' : '' }}"
            href="{{ route('user.openmatches') }}">
-            Open Match
+            {{ __('Open Match') }}
         </a>
 
         @if($user ?? false)
 
             <a class="{{ request()->routeIs('user.bookings*') ? 'active' : '' }}"
                href="{{ route('user.bookings') }}">
-                Booking Saya
+                {{ __('Booking Saya') }}
             </a>
 
             <a class="{{ request()->routeIs('user.rewards*') ? 'active' : '' }}"
                href="{{ route('user.rewards') }}">
-                Tukar Poin
+                {{ __('Tukar Poin') }}
             </a>
 
             {{-- MENU DAFTARKAN VENUE --}}
             <a class="{{ request()->routeIs('user.venue-application*') ? 'active' : '' }}"
                href="{{ route('user.venue-application') }}">
                 <i class="fa-solid fa-building"></i>
-                Daftarkan Venue
+                {{ __('Daftarkan Venue') }}
             </a>
 
         @endif
@@ -88,7 +88,7 @@
 
             @if($user->role === 'venue_admin')
                 <a href="{{ route('admin.dashboard') }}" style="display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:10px; background:#0e5a36; color:#fff; font-size:12px; font-weight:700; text-decoration:none; margin-right:6px;">
-                    <i class="fa-solid fa-chart-line"></i> Panel Admin Venue
+                    <i class="fa-solid fa-chart-line"></i> {{ __('Panel Admin Venue') }}
                 </a>
             @endif
 
@@ -118,8 +118,8 @@
                 <div class="u-notif-menu" id="uNotifMenu" hidden>
 
                     <div class="u-notif-head">
-                        <strong>Notifikasi</strong>
-                        <a href="{{ route('user.notifications') }}">Lihat semua</a>
+                        <strong>{{ __('Notifikasi') }}</strong>
+                        <a href="{{ route('user.notifications') }}">{{ __('Lihat semua') }}</a>
                     </div>
 
                     <div id="uNotifItemsContainer">
@@ -152,7 +152,7 @@
                         @empty
 
                             <div class="u-notif-empty">
-                                Belum ada notifikasi.
+                                {{ __('Belum ada notifikasi.') }}
                             </div>
 
                         @endforelse
@@ -162,15 +162,15 @@
                         <form id="uNotifReadAllForm" method="POST" action="{{ route('user.notifications.read-all') }}" style="flex:1;">
                             @csrf
                             <button class="u-notif-all" type="submit" style="width:100%;" {{ $user->unreadNotifications()->exists() ? '' : 'disabled' }}>
-                                <i class="fa-solid fa-check-double"></i> Tandai sudah dibaca
+                                <i class="fa-solid fa-check-double"></i> {{ __('Tandai sudah dibaca') }}
                             </button>
                         </form>
                         <form method="POST" action="{{ route('user.notifications.clear') }}"
-                              onsubmit="return confirm('Hapus seluruh notifikasi akun ini? Tindakan ini tidak dapat dibatalkan.');">
+                              onsubmit="return confirm('{{ __('Hapus seluruh notifikasi akun ini? Tindakan ini tidak dapat dibatalkan.') }}');">
                             @csrf
                             @method('DELETE')
                             <button class="u-notif-all" type="submit" style="color:#b42318;" {{ $user->notifications()->exists() ? '' : 'disabled' }}>
-                                <i class="fa-regular fa-trash-can"></i> Clear
+                                <i class="fa-regular fa-trash-can"></i> {{ __('Hapus') }}
                             </button>
                         </form>
                     </div>
@@ -210,7 +210,7 @@
             <form action="{{ route('logout.perform') }}" method="POST">
                 @csrf
 
-                <button class="u-logout" title="Keluar">
+                <button class="u-logout" title="{{ __('Keluar') }}">
                     <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 </button>
             </form>
@@ -220,8 +220,8 @@
     @else
 
         <div class="u-guest-actions">
-            <a href="{{ route('login') }}">Login</a>
-            <a class="u-btn small" href="{{ route('register') }}">Daftar</a>
+            <a href="{{ route('login') }}">{{ __('Masuk') }}</a>
+            <a class="u-btn small" href="{{ route('register') }}">{{ __('Daftar') }}</a>
         </div>
 
     @endif

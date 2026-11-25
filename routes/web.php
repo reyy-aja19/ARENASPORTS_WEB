@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\ChatbotSettingsController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\MidtransController;
 use App\Http\Controllers\MarketplaceController;
 use App\Http\Controllers\UserNotificationController;
@@ -22,6 +23,18 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 })->name('welcome');
+
+Route::post('/kontak', [ContactController::class, 'send'])
+    ->middleware('throttle:5,1')
+    ->name('contact.send');
+
+Route::get('/lang/{locale}', function (string $locale) {
+    if (! in_array($locale, ['id', 'en'], true)) {
+        abort(404);
+    }
+    session(['locale' => $locale]);
+    return redirect()->back();
+})->name('lang.switch');
 
 Route::get('/dashboard', function () {
     if (!session('admin_logged_in') || !session('admin_user_id')) {
@@ -285,6 +298,11 @@ Route::middleware([CekLogin::class, 'role:user'])
             'paymentStatus'
         ])->name('payments.status');
 
+        Route::get('/pembayaran/{payment}/status-json', [
+            MidtransController::class,
+            'paymentStatusJson'
+        ])->name('payments.status-json');
+
         Route::get('/pembayaran/{payment}/bayar', [
             MidtransController::class,
             'paymentPage'
@@ -476,6 +494,35 @@ Route::middleware([CekLogin::class, 'role:superadmin,venue_admin'])
         |--------------------------------------------------------------------------
         */
 
+        // Rewards - dapat diakses superadmin dan venue admin
+        Route::get('/rewards', [AdminController::class, 'rewards'])
+            ->name('rewards');
+
+        Route::post('/rewards', [AdminController::class, 'rewardStore'])
+            ->name('rewards.store');
+
+        Route::get('/rewards/{reward}/edit', [
+            AdminController::class,
+            'rewardEdit'
+        ])->name('rewards.edit');
+
+        Route::put('/rewards/{reward}', [
+            AdminController::class,
+            'rewardUpdate'
+        ])->name('rewards.update');
+
+        Route::post('/rewards/{reward}/toggle', [
+            AdminController::class,
+            'rewardToggle'
+        ])->name('rewards.toggle');
+
+        Route::delete('/rewards/{reward}', [
+            AdminController::class,
+            'rewardDelete'
+        ])->name('rewards.delete');
+
+        Route::post('/redemptions/{redemption}/verify', [AdminController::class, 'redemptionVerify'])->name('redemptions.verify');
+
         Route::middleware('role:superadmin')->group(function () {
 
             // Pengajuan venue
@@ -525,33 +572,6 @@ Route::middleware([CekLogin::class, 'role:superadmin,venue_admin'])
                 ->name('venues.manage');
             Route::get('/venues-manage/{venue}', [AdminController::class, 'venueManageShow'])
                 ->name('venues.manage.show');
-
-            // Rewards
-            Route::get('/rewards', [AdminController::class, 'rewards'])
-                ->name('rewards');
-
-            Route::post('/rewards', [AdminController::class, 'rewardStore'])
-                ->name('rewards.store');
-
-            Route::get('/rewards/{reward}/edit', [
-                AdminController::class,
-                'rewardEdit'
-            ])->name('rewards.edit');
-
-            Route::put('/rewards/{reward}', [
-                AdminController::class,
-                'rewardUpdate'
-            ])->name('rewards.update');
-
-            Route::post('/rewards/{reward}/toggle', [
-                AdminController::class,
-                'rewardToggle'
-            ])->name('rewards.toggle');
-
-            Route::delete('/rewards/{reward}', [
-                AdminController::class,
-                'rewardDelete'
-            ])->name('rewards.delete');
 
             // Chatbot
             Route::get('/chatbot-settings', [
@@ -742,6 +762,11 @@ Route::middleware([CekLogin::class, 'role:superadmin,venue_admin'])
             AdminController::class,
             'paymentVerify'
         ])->name('payments.verify');
+
+        Route::post('/payments/{payment}/sync', [
+            AdminController::class,
+            'paymentSync'
+        ])->name('payments.sync');
 
         /*
         |--------------------------------------------------------------------------

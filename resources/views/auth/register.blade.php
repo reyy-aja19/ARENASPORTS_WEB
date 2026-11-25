@@ -1,12 +1,12 @@
 
 <!DOCTYPE html>
-<html lang="id">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#073e2b">
 
-    <title>Daftar - ARENASPORTS</title>
+    <title>{{ __('Daftar') }} - ARENASPORTS</title>
 
     <link rel="stylesheet" href="{{ asset('user-ui.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
@@ -105,31 +105,18 @@
             </span>
 
             <h1>
-                Mulai perjalananmu.<br>
-                <em>Temukan permainan.</em>
+                {{ __('Mulai perjalananmu.') }}<br>
+                <em>{{ __('Temukan permainan.') }}</em>
             </h1>
 
             <p>
-                Bergabung dengan ArenaSports dan nikmati kemudahan
-                mencari lapangan, melakukan booking, serta bermain
-                bersama teman.
+                {{ __('Buat akun dan mulai pengalaman olahraga yang lebih mudah.') }}
             </p>
 
             <div class="u-auth-benefits">
-                <span>
-                    <i class="fa-solid fa-location-dot"></i>
-                    Venue pilihan
-                </span>
-
-                <span>
-                    <i class="fa-solid fa-calendar-check"></i>
-                    Booking mudah
-                </span>
-
-                <span>
-                    <i class="fa-solid fa-trophy"></i>
-                    Poin &amp; reward
-                </span>
+                <span><i class="fa-solid fa-location-dot"></i> {{ __('Venue pilihan') }}</span>
+                <span><i class="fa-solid fa-calendar-check"></i> {{ __('Booking mudah') }}</span>
+                <span><i class="fa-solid fa-trophy"></i> {{ __('Poin & reward') }}</span>
             </div>
 
         </div>
@@ -150,13 +137,13 @@
             </div>
 
             <span class="u-form-kicker">
-                BUAT AKUN BARU
+                {{ __('Buat akun baru') }}
             </span>
 
-            <h2>Daftar ArenaSports</h2>
+            <h2>{{ __('Daftar ArenaSports') }}</h2>
 
             <p>
-                Buat akun dan mulai pengalaman olahraga yang lebih mudah.
+                {{ __('Buat akun dan mulai pengalaman olahraga yang lebih mudah.') }}
             </p>
 
             {{-- Pesan error --}}
@@ -196,80 +183,37 @@
 
                 {{-- Nama lengkap --}}
                 <div class="u-field">
-                    <label for="name">Nama lengkap</label>
+                    <label for="name">{{ __('Nama lengkap') }}</label>
 
-                    <input
-                        id="name"
-                        type="text"
-                        name="name"
-                        value="{{ old('name') }}"
-                        placeholder="Masukkan nama lengkap"
-                        required
-                        autocomplete="name"
-                    >
+                    <input id="name" type="text" name="name" value="{{ old('name') }}" placeholder="{{ __('Masukkan nama lengkap') }}" required autocomplete="name">
                 </div>
 
                 {{-- Email --}}
                 <div class="u-field">
-                    <label for="email">Alamat email</label>
+                    <label for="email">{{ __('Alamat email') }}</label>
 
-                    <input
-                        id="email"
-                        type="email"
-                        name="email"
-                        value="{{ old('email') }}"
-                        placeholder="nama@email.com"
-                        required
-                        autocomplete="email"
-                    >
+                    <input id="email" type="email" name="email" value="{{ old('email') }}" placeholder="nama@email.com" required autocomplete="email">
                 </div>
 
                 {{-- Nomor HP --}}
                 <div class="u-field">
-                    <label for="phone">Nomor HP (opsional)</label>
+                    <label for="phone">{{ __('Nomor HP (opsional)') }}</label>
 
-                    <input
-                        id="phone"
-                        type="tel"
-                        name="phone"
-                        value="{{ old('phone') }}"
-                        placeholder="08xxxxxxxxxx"
-                        autocomplete="tel"
-                    >
+                    <input id="phone" type="tel" name="phone" value="{{ old('phone') }}" placeholder="08xxxxxxxxxx" autocomplete="tel">
                 </div>
 
                 {{-- Password --}}
                 <div class="u-field">
-                    <label for="password">
-                        Password (minimal 8 karakter)
-                    </label>
+                    <label for="password">{{ __('Password (minimal 8 karakter)') }}</label>
 
-                    <input
-                        id="password"
-                        type="password"
-                        name="password"
-                        placeholder="Buat password"
-                        required
-                        minlength="8"
-                        autocomplete="new-password"
-                    >
+                    <input id="password" type="password" name="password" placeholder="{{ __('Buat password') }}" required minlength="8" autocomplete="new-password">
                 </div>
 
                 {{-- Konfirmasi password --}}
                 <div class="u-field">
-                    <label for="password_confirmation">
-                        Konfirmasi password
-                    </label>
+                    <label for="password_confirmation">{{ __('Konfirmasi password') }}</label>
 
-                    <input
-                        id="password_confirmation"
-                        type="password"
-                        name="password_confirmation"
-                        placeholder="Ulangi password"
-                        required
-                        minlength="8"
-                        autocomplete="new-password"
-                    >
+                    <input id="password_confirmation" type="password" name="password_confirmation" placeholder="{{ __('Ulangi password') }}" required minlength="8" autocomplete="new-password">
                 </div>
 
                 {{-- Cloudflare Turnstile CAPTCHA --}}
@@ -282,49 +226,31 @@
                 </div>
 
                 {{-- Tombol daftar --}}
-                <button
-                    class="u-btn u-register-submit"
-                    type="submit">
-                    Buat akun ArenaSports
+                <button class="u-btn u-register-submit" type="submit">
+                    {{ __('Buat akun ArenaSports') }}
                     <i class="fa-solid fa-arrow-right"></i>
                 </button>
 
             </form>
 
             <div class="u-login-divider">
-                <span>atau daftar dengan</span>
+                <span>{{ __('atau daftar dengan') }}</span>
             </div>
 
             <div class="u-register-options">
-
-                {{-- Daftar WhatsApp --}}
-                <a href="{{ route('phone.register') }}">
-                    <i class="fa-brands fa-whatsapp"></i>
-                    Daftar dengan WhatsApp
-                </a>
-
-                {{-- Daftar Google --}}
-                <a href="{{ route('auth.google.redirect') }}">
-                    <i class="fa-brands fa-google"></i>
-                    Daftar dengan Google
-                </a>
-
-                {{-- Daftar Apple --}}
-                <a href="{{ route('auth.apple.redirect') }}">
-                    <i class="fa-brands fa-apple"></i>
-                    Lanjutkan dengan Apple
-                </a>
-
+                <a href="{{ route('phone.register') }}"><i class="fa-brands fa-whatsapp"></i> {{ __('Daftar dengan WhatsApp') }}</a>
+                <a href="{{ route('auth.google.redirect') }}"><i class="fa-brands fa-google"></i> {{ __('Daftar dengan Google') }}</a>
+                <a href="{{ route('auth.apple.redirect') }}"><i class="fa-brands fa-apple"></i> {{ __('Lanjutkan dengan Apple') }}</a>
             </div>
 
             <p class="u-register-login">
-                Sudah punya akun?
-                <a href="{{ route('login') }}">Masuk sekarang</a>
+                {{ __('Sudah punya akun?') }}
+                <a href="{{ route('login') }}">{{ __('Masuk sekarang') }}</a>
             </p>
 
             <div class="u-login-security">
                 <i class="fa-solid fa-shield-halved"></i>
-                Informasi akun kamu dilindungi.
+                {{ __('Informasi akun kamu dilindungi.') }}
             </div>
 
         </div>

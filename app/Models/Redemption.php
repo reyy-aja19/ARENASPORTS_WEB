@@ -12,15 +12,20 @@ class Redemption extends Model
     protected $fillable = [
         'user_id',
         'reward_id',
+        'owner_admin_id',
+        'venue_id',
         'redeemed_at',
         'qr_code',
         'status',
+        'verified_at',
+        'verified_by',
     ];
 
     protected function casts(): array
     {
         return [
             'redeemed_at' => 'datetime',
+            'verified_at' => 'datetime',
         ];
     }
 
@@ -32,5 +37,20 @@ class Redemption extends Model
     public function reward()
     {
         return $this->belongsTo(Reward::class);
+    }
+
+    public function owner()
+    {
+        return $this->belongsTo(User::class, 'owner_admin_id');
+    }
+
+    public function venue()
+    {
+        return $this->belongsTo(Venue::class);
+    }
+
+    public function verifier()
+    {
+        return $this->belongsTo(User::class, 'verified_by');
     }
 }

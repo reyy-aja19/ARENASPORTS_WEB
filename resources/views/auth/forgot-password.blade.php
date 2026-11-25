@@ -1,10 +1,10 @@
 
 <!DOCTYPE html>
-<html lang="id">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lupa Password · ARENASPORTS</title>
+    <title>{{ __('Lupa Password?') }} · ARENASPORTS</title>
     <link rel="stylesheet" href="{{ asset('user-ui.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
@@ -76,8 +76,8 @@
 </head>
 <body>
     <main class="reset-card">
-        <h1>Lupa Password?</h1>
-        <p>Masukkan alamat email yang terhubung dengan akun ARENASPORTS. Kami akan mengirimkan tautan untuk mengatur ulang password kamu.</p>
+        <h1>{{ __('Lupa Password?') }}</h1>
+        <p>{{ __('Masukkan alamat email yang terhubung dengan akun ARENASPORTS. Kami akan mengirimkan tautan untuk mengatur ulang password kamu.') }}</p>
 
         @if (session('status'))
             <div class="reset-alert reset-success">
@@ -94,7 +94,7 @@
         <form method="POST" action="{{ route('password.email') }}">
             @csrf
 
-            <label for="email">Alamat Email</label>
+            <label for="email">{{ __('Alamat email') }}</label>
             <input
                 type="email"
                 id="email"
@@ -105,11 +105,11 @@
                 autofocus
             >
 
-            <button type="submit">Kirim Tautan Reset</button>
+            <button type="submit">{{ __('Kirim Tautan Reset') }}</button>
         </form>
 
         <a href="{{ route('login') }}" class="reset-back">
-            <i class="fa-solid fa-arrow-left"></i> Kembali ke Login
+            <i class="fa-solid fa-arrow-left"></i> {{ __('Kembali ke Login') }}
         </a>
     </main>
 @include('layouts.partials.site-footer')

@@ -29,27 +29,49 @@
         <select class="mini-select" data-local-filter-select="status"><option value="">Semua status</option><option>Open</option><option>Penuh</option><option>Selesai</option><option>Dibatalkan</option></select>
     </div>
 
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px;">
+        @php
+            $tabs = [
+                'aktif' => 'Aktif',
+                'selesai' => 'Selesai',
+                'dibatalkan' => 'Dibatalkan',
+                'semua' => 'Semua',
+            ];
+        @endphp
+        @foreach($tabs as $key => $label)
+            <a href="{{ route('admin.openmatches', ['filter' => $key]) }}"
+               class="btn-ui {{ ($filter ?? 'aktif') === $key ? 'btn-green' : 'btn-gray' }}"
+               style="text-decoration:none;padding:8px 14px;font-size:12px;">
+                {{ $label }} ({{ $counts[$key] ?? 0 }})
+            </a>
+        @endforeach
+    </div>
+    @if(($filter ?? 'aktif') === 'aktif')
+        <p style="margin:0 0 12px;color:#64748b;font-size:12px;">Menampilkan open match aktif. Match selesai/dibatalkan disembunyikan agar daftar tetap rapi, tetapi masih bisa dibuka lewat tab Arsip.</p>
+    @endif
+
     <form id="openMatchForm" class="surface compact-form openmatch-form-mobile" action="{{ route('admin.openmatches.store') }}" method="POST">
         @csrf
-        <h3>Buat Event / Open Match Resmi</h3>
-        <div class="openmatch-form-section">Detail Pertandingan Dasar</div>
+        <h3>Buat Open Match Komunitas</h3>
+        <div class="openmatch-form-section">Detail Pertandingan</div>
         <div class="grid-4">
-            <div class="form-group"><label>Judul Match</label><input class="input-ui" name="title" placeholder="Contoh: Tim kaciw" required></div>
+            <div class="form-group"><label>Judul Match</label><input class="input-ui" name="title" placeholder="Contoh: Cari lawan futsal" required></div>
             <div class="form-group"><label>Cabang Olahraga</label><select class="select-ui" name="jenis" required><option>Futsal</option><option>Badminton</option><option>Basket</option><option>Voli</option></select></div>
-            <div class="form-group"><label>Jam Mulai</label><input class="input-ui" type="time" name="start_time" value="19:00"></div>
-            <div class="form-group"><label>Jam Selesai</label><input class="input-ui" type="time" name="end_time" value="20:00"></div>
+            <div class="form-group"><label>Jenis Pendaftaran</label><select class="select-ui" name="registration_type" required><option value="Individu">Individu (1 orang = 1 slot)</option><option value="Kelompok">Kelompok (1 kelompok = 1 slot)</option></select></div>
+            <div class="form-group"><label>Status</label><select class="select-ui" name="status" required><option value="Open">Mencari Pemain</option><option value="Penuh">Penuh</option><option value="Selesai">Selesai</option><option value="Dibatalkan">Dibatalkan</option></select></div>
         </div>
         <div class="grid-4">
             <div class="form-group"><label>Tanggal</label><input class="input-ui" type="date" name="tanggal" value="{{ now()->format('Y-m-d') }}" required></div>
-            <div class="form-group"><label>Slot Dibutuhkan</label><input class="input-ui" type="number" name="jumlah_pemain" value="5" min="1" max="99" required></div>
-            <div class="form-group"><label>Sudah Join</label><input class="input-ui" type="number" name="jumlah_bergabung" value="0" min="0" max="99"></div>
-        <div class="grid-4">
-            <div class="form-group"><label>Biaya / Pemain</label><input class="input-ui" type="number" name="biaya_per_pemain" min="0" max="10000000" placeholder="0 = gratis"></div>
-            <div class="form-group"><label>Level</label><select class="select-ui" name="level"><option value="">Umum</option><option>Santai</option><option>Pemula</option><option>Menengah</option><option>Mahir</option><option>Kompetitif</option></select></div>
-            <div class="form-group"><label>WA Host</label><input class="input-ui" name="contact_phone" maxlength="30" placeholder="08xxxxxxxxxx"></div>
-            <div class="form-group"><label>Status</label><select class="select-ui" name="status" required><option>Open</option><option>Penuh</option><option>Selesai</option><option>Dibatalkan</option></select></div>
+            <div class="form-group"><label>Jam Mulai</label><input class="input-ui" type="time" name="start_time" value="19:00"></div>
+            <div class="form-group"><label>Jam Selesai</label><input class="input-ui" type="time" name="end_time" value="20:00"></div>
+            <div class="form-group"><label>Kapasitas Slot</label><input class="input-ui" type="number" name="jumlah_pemain" value="5" min="1" max="99" required></div>
         </div>
-        <div class="form-group"><label>Booking Terkait</label><select class="select-ui" name="booking_id"><option value="">Tanpa booking terkait</option>@foreach($bookings as $booking)<option value="{{ $booking->id }}">{{ $booking->user?->name }} • {{ $booking->lapangan?->nama }} • {{ optional($booking->booking_date)->format('d M Y') }} {{ $booking->start_time }}-{{ $booking->end_time }}</option>@endforeach</select></div>
+        <div class="grid-4">
+            <div class="form-group"><label>Slot Terisi</label><input class="input-ui" type="number" name="jumlah_bergabung" value="0" min="0" max="99"></div>
+            <div class="form-group"><label>Biaya / Slot</label><input class="input-ui" type="number" name="biaya_per_pemain" min="0" max="10000000" placeholder="0 = gratis"></div>
+            <div class="form-group"><label>Level</label><select class="select-ui" name="level"><option value="">Umum</option><option>Santai</option><option>Pemula</option><option>Menengah</option><option>Mahir</option><option>Kompetitif</option></select></div>
+            <div class="form-group"><label>Booking Terkait</label><select class="select-ui" name="booking_id"><option value="">Tanpa booking terkait</option>@foreach($bookings as $booking)<option value="{{ $booking->id }}">{{ $booking->user?->name }} • {{ $booking->lapangan?->nama }} • {{ optional($booking->booking_date)->format('d M Y') }} {{ $booking->start_time }}-{{ $booking->end_time }}</option>@endforeach</select></div>
+        </div>
         <div class="form-group"><label>Deskripsi Tambahan</label><textarea class="textarea-ui" name="deskripsi" placeholder="Ketikkan detail lawan, level, aturan main, atau kebutuhan tambahan."></textarea></div>
         <div style="display:flex; justify-content:flex-end;"><button class="btn-ui btn-green"><i class="fa-solid fa-paper-plane"></i> Publikasikan Open Match</button></div>
     </form>
@@ -58,22 +80,57 @@
         @forelse($matches as $match)
             @php
                 $percent = $match->jumlah_pemain > 0 ? min(100, round(($match->jumlah_bergabung / $match->jumlah_pemain) * 100)) : 0;
-                $statusClass = strtolower(str_replace(' ', '-', $match->status));
+                $statusClass = $match->status_tone;
+                $statusLabels = ['Open' => 'Mencari Pemain', 'Penuh' => 'Penuh', 'Selesai' => 'Selesai', 'Dibatalkan' => 'Dibatalkan'];
             @endphp
-            <div class="openmatch-card mobile-match-card" data-search-item data-jenis="{{ $match->jenis }}" data-status="{{ $match->status }}">
+            <div class="openmatch-card mobile-match-card" data-search-item data-jenis="{{ $match->jenis }}" data-status="{{ $match->display_status }}">
                 <div class="match-avatar"><i class="fa-solid fa-people-group"></i></div>
                 <div class="openmatch-card-head">
-                    <div><h3>{{ $match->title }}</h3><span class="openmatch-sport">{{ $match->jenis }}</span></div>
-                    <span class="openmatch-status status-{{ $statusClass }}">{{ $match->status }}</span>
+                    <div>
+                        <h3>{{ $match->title }}</h3>
+                        <span class="openmatch-sport">{{ $match->jenis }} · {{ $match->registration_type_label }}</span>
+                    </div>
+                    <span class="openmatch-status status-{{ $statusClass }}">{{ $match->display_status }}</span>
                 </div>
                 <div class="openmatch-meta mobile-meta">
                     <span><i class="fa-regular fa-calendar"></i> {{ optional($match->tanggal)->format('d/m/Y') }}</span>
                     <span><i class="fa-regular fa-clock"></i> {{ $match->start_time ?? '-' }} - {{ $match->end_time ?? '-' }}</span>
                     <span><i class="fa-solid fa-location-dot"></i> {{ $match->booking?->lapangan?->nama ?? 'Belum terkait booking' }}</span>
                 </div>
-                <div class="openmatch-progress"><div class="openmatch-progress-text"><strong>{{ $match->jumlah_bergabung }}/{{ $match->jumlah_pemain }}</strong><span>slot terisi</span></div><div class="progress-track"><span style="width: {{ $percent }}%"></span></div></div>
+                <div class="openmatch-progress">
+                    <div class="openmatch-progress-text"><strong>{{ $match->jumlah_bergabung }}/{{ $match->jumlah_pemain }}</strong><span>slot {{ $match->capacity_label }}</span></div>
+                    <div class="progress-track"><span style="width: {{ $percent }}%"></span></div>
+                </div>
+                @if($match->participants->isNotEmpty())
+                    <div class="openmatch-desc"><strong>Peserta:</strong>
+                        {{ $match->participants->map(fn($p) => ($p->pivot?->role === 'Host' ? 'Host: ' : 'Lawan: ') . $p->name . ($p->pivot?->team_name ? ' ('.$p->pivot->team_name.')' : ''))->implode(' · ') }}
+                    </div>
+                @endif
                 @if($match->deskripsi)<div class="openmatch-desc">{{ $match->deskripsi }}</div>@endif
-                <details class="openmatch-edit"><summary>Edit</summary><form action="{{ route('admin.openmatches.update', $match) }}" method="POST" class="openmatch-inline-form">@csrf @method('PUT')<div class="grid-4"><div class="form-group"><label>Judul</label><input class="input-ui" name="title" value="{{ $match->title }}" required></div><div class="form-group"><label>Jenis</label><select class="select-ui" name="jenis">@foreach(['Futsal','Badminton','Basket','Voli'] as $jenis)<option value="{{ $jenis }}" {{ $match->jenis === $jenis ? 'selected' : '' }}>{{ $jenis }}</option>@endforeach</select></div><div class="form-group"><label>Tanggal</label><input class="input-ui" type="date" name="tanggal" value="{{ optional($match->tanggal)->format('Y-m-d') }}" required></div><div class="form-group"><label>Status</label><select class="select-ui" name="status">@foreach(['Open','Penuh','Selesai','Dibatalkan'] as $status)<option value="{{ $status }}" {{ $match->status === $status ? 'selected' : '' }}>{{ $status }}</option>@endforeach</select></div></div><div class="grid-4"><div class="form-group"><label>Mulai</label><input class="input-ui" type="time" name="start_time" value="{{ $match->start_time }}"></div><div class="form-group"><label>Selesai</label><input class="input-ui" type="time" name="end_time" value="{{ $match->end_time }}"></div><div class="form-group"><label>Target</label><input class="input-ui" type="number" name="jumlah_pemain" min="1" max="99" value="{{ $match->jumlah_pemain }}" required></div><div class="form-group"><label>Join</label><input class="input-ui" type="number" name="jumlah_bergabung" min="0" max="99" value="{{ $match->jumlah_bergabung }}"></div></div><div class="form-group"><label>Booking Terkait</label><select class="select-ui" name="booking_id"><option value="">Tanpa booking terkait</option>@foreach($bookings as $booking)<option value="{{ $booking->id }}" {{ $match->booking_id == $booking->id ? 'selected' : '' }}>{{ $booking->user?->name }} • {{ $booking->lapangan?->nama }} • {{ optional($booking->booking_date)->format('d M Y') }}</option>@endforeach</select></div><div class="grid-4"><div class="form-group"><label>Biaya/Pemain</label><input class="input-ui" type="number" name="biaya_per_pemain" min="0" max="10000000" value="{{ $match->biaya_per_pemain }}"></div><div class="form-group"><label>Level</label><input class="input-ui" name="level" maxlength="50" value="{{ $match->level }}"></div><div class="form-group"><label>WA Host</label><input class="input-ui" name="contact_phone" maxlength="30" value="{{ $match->contact_phone }}"></div></div><div class="form-group"><label>Deskripsi</label><textarea class="textarea-ui" name="deskripsi">{{ $match->deskripsi }}</textarea></div><div class="btn-row wrap"><button class="btn-ui btn-green" type="submit">Simpan</button></div></form></details>
+                <details class="openmatch-edit"><summary>Edit</summary>
+                    <form action="{{ route('admin.openmatches.update', $match) }}" method="POST" class="openmatch-inline-form">@csrf @method('PUT')
+                        <div class="grid-4">
+                            <div class="form-group"><label>Judul</label><input class="input-ui" name="title" value="{{ $match->title }}" required></div>
+                            <div class="form-group"><label>Jenis</label><select class="select-ui" name="jenis">@foreach(['Futsal','Badminton','Basket','Voli'] as $jenis)<option value="{{ $jenis }}" {{ $match->jenis === $jenis ? 'selected' : '' }}>{{ $jenis }}</option>@endforeach</select></div>
+                            <div class="form-group"><label>Jenis Pendaftaran</label><select class="select-ui" name="registration_type">@foreach(['Individu','Kelompok'] as $rt)<option value="{{ $rt }}" {{ $match->registration_type === $rt ? 'selected' : '' }}>{{ $rt }}</option>@endforeach</select></div>
+                            <div class="form-group"><label>Status</label><select class="select-ui" name="status">@foreach($statusLabels as $value => $label)<option value="{{ $value }}" {{ $match->status === $value ? 'selected' : '' }}>{{ $label }}</option>@endforeach</select></div>
+                        </div>
+                        <div class="grid-4">
+                            <div class="form-group"><label>Tanggal</label><input class="input-ui" type="date" name="tanggal" value="{{ optional($match->tanggal)->format('Y-m-d') }}" required></div>
+                            <div class="form-group"><label>Mulai</label><input class="input-ui" type="time" name="start_time" value="{{ $match->start_time }}"></div>
+                            <div class="form-group"><label>Selesai</label><input class="input-ui" type="time" name="end_time" value="{{ $match->end_time }}"></div>
+                            <div class="form-group"><label>Kapasitas Slot</label><input class="input-ui" type="number" name="jumlah_pemain" min="1" max="99" value="{{ $match->jumlah_pemain }}" required></div>
+                        </div>
+                        <div class="grid-4">
+                            <div class="form-group"><label>Slot Terisi</label><input class="input-ui" type="number" name="jumlah_bergabung" min="0" max="99" value="{{ $match->jumlah_bergabung }}"></div>
+                            <div class="form-group"><label>Biaya/Slot</label><input class="input-ui" type="number" name="biaya_per_pemain" min="0" max="10000000" value="{{ $match->biaya_per_pemain }}"></div>
+                            <div class="form-group"><label>Level</label><input class="input-ui" name="level" maxlength="50" value="{{ $match->level }}"></div>
+                            <div class="form-group"><label>Booking Terkait</label><select class="select-ui" name="booking_id"><option value="">Tanpa booking terkait</option>@foreach($bookings as $booking)<option value="{{ $booking->id }}" {{ $match->booking_id == $booking->id ? 'selected' : '' }}>{{ $booking->user?->name }} • {{ $booking->lapangan?->nama }} • {{ optional($booking->booking_date)->format('d M Y') }}</option>@endforeach</select></div>
+                        </div>
+                        <div class="form-group"><label>Deskripsi</label><textarea class="textarea-ui" name="deskripsi">{{ $match->deskripsi }}</textarea></div>
+                        <div class="btn-row wrap"><button class="btn-ui btn-green" type="submit">Simpan</button></div>
+                    </form>
+                </details>
                 <div class="btn-row wrap openmatch-actions">
                     <a href="{{ route('user.openmatches.chat', $match) }}" class="btn-ui btn-green" target="_blank" style="text-decoration:none;"><i class="fa-solid fa-comments"></i> Obrolan</a>
                     <form method="POST" action="{{ route('admin.openmatches.toggle', $match) }}">@csrf<button class="btn-ui btn-gray" type="submit">Ubah Status</button></form>

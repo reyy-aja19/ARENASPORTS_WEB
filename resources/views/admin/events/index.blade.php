@@ -46,8 +46,10 @@
             </select>
             <select class="select-ui" data-local-filter-select="status" style="padding:8px 12px; font-size:13px;">
                 <option value="">Semua Status</option>
-                <option value="Publikasi">Publikasi</option>
-                <option value="Draft">Draft</option>
+                <option value="Segera Dibuka">Segera Dibuka</option>
+                <option value="Dibuka">Dibuka</option>
+                <option value="Penuh">Penuh</option>
+                <option value="Selesai">Selesai</option>
                 <option value="Dibatalkan">Dibatalkan</option>
             </select>
         </div>
@@ -60,6 +62,7 @@
                     <th>No</th>
                     <th>Nama Event</th>
                     <th>Cabang</th>
+                    <th>Jenis</th>
                     <th>Jadwal</th>
                     <th>Lokasi Venue</th>
                     <th>Kuota</th>
@@ -70,13 +73,12 @@
             <tbody>
                 @forelse($events as $i => $event)
                     @php
-                        $statusClass = match($event->status) {
-                            'Publikasi' => 'status-active',
-                            'Draft' => 'status-inactive',
+                        $statusClass = match($event->display_status) {
+                            'Dibuka' => 'status-active',
                             default => 'status-inactive',
                         };
                     @endphp
-                    <tr data-search-item data-jenis="{{ $event->jenis }}" data-status="{{ $event->status }}">
+                    <tr data-search-item data-jenis="{{ $event->jenis }}" data-status="{{ $event->display_status }}">
                         <td>{{ $i + 1 }}</td>
                         <td>
                             <strong>{{ $event->title }}</strong>
@@ -84,26 +86,17 @@
                                 <br><small style="color:#718078;">Oleh: {{ $event->creator->name }}</small>
                             @endif
                         </td>
-                        <td>
-                            <span style="font-weight:600; color:#143e26;">{{ $event->jenis }}</span>
-                        </td>
+                        <td><span style="font-weight:600; color:#143e26;">{{ $event->jenis }}</span></td>
+                        <td><span style="font-size:12px; color:#526b5c;">{{ $event->registration_type_label }}</span></td>
                         <td>
                             <i class="fa-regular fa-calendar"></i> {{ optional($event->tanggal)->format('d M Y') }}
                             @if($event->start_time)
                                 <br><small style="color:#64748b;"><i class="fa-regular fa-clock"></i> {{ substr($event->start_time, 0, 5) }} - {{ $event->end_time ? substr($event->end_time, 0, 5) : 'Selesai' }}</small>
                             @endif
                         </td>
-                        <td>
-                            <i class="fa-solid fa-location-dot" style="color:#10b04a;"></i> {{ $event->lokasi }}
-                        </td>
-                        <td>
-                            <strong>{{ $event->kuota }}</strong> <span style="font-size:12px; color:#64748b;">peserta</span>
-                        </td>
-                        <td>
-                            <span class="{{ $statusClass }}">
-                                {{ $event->status }}
-                            </span>
-                        </td>
+                        <td><i class="fa-solid fa-location-dot" style="color:#10b04a;"></i> {{ $event->lokasi }}</td>
+                        <td><strong>{{ $event->registrations_count ?? 0 }}</strong>/<strong>{{ $event->kuota }}</strong> <span style="font-size:12px; color:#64748b;">{{ $event->quota_unit }}</span></td>
+                        <td><span class="{{ $statusClass }}">{{ $event->display_status }}</span></td>
                         <td>
                             <div class="btn-row wrap">
                                 <a class="btn-ui btn-gray" href="{{ route('admin.events.registrations', $event) }}" style="padding:6px 12px; font-size:12px;">

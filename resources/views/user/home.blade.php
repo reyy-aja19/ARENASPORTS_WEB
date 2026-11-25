@@ -566,18 +566,16 @@
             </span>
 
             <h1>
-                Halo, {{ $user->name }}!
-                <br>Siap bermain hari ini?
+                {{ __('Halo,') }} {{ $user->name }}!
+                <br>{{ __('Siap bermain hari ini?') }}
             </h1>
 
             <p>
-                Temukan venue olahraga, pilih lapangan yang sesuai,
-                booking jadwal favoritmu, dan ajak pemain lain bergabung
-                lewat Open Match.
+                {{ __('Temukan venue olahraga, pilih lapangan yang sesuai, booking jadwal favoritmu, dan ajak pemain lain bergabung lewat Open Match.') }}
             </p>
 
             <a class="uh-hero-cta" href="{{ route('user.venues') }}">
-                Jelajahi Venue
+                {{ __('Jelajahi Venue') }}
                 <i class="fa-solid fa-arrow-right"></i>
             </a>
         </div>
@@ -600,7 +598,7 @@
                 </div>
             </div>
             <a href="{{ route('user.venue-application') }}" class="u-btn" style="background:#ca8a04; color:#fff; text-decoration:none; padding:10px 18px; font-size:13px; border-radius:10px; font-weight:700;">
-                Lihat Detail Status
+                {{ __('Lihat Detail Status') }}
             </a>
         </div>
     @endif
@@ -613,7 +611,7 @@
                     <i class="fa-solid fa-ticket"></i>
                 </div>
                 <div>
-                    <span style="display:inline-block; font-size:11px; font-weight:800; background:#bbf7d0; color:#14532d; padding:4px 10px; border-radius:20px; margin-bottom:6px; letter-spacing:.5px;">JADWAL SEWA MENDATANG</span>
+                    <span style="display:inline-block; font-size:11px; font-weight:800; background:#bbf7d0; color:#14532d; padding:4px 10px; border-radius:20px; margin-bottom:6px; letter-spacing:.5px;">{{ __('JADWAL SEWA MENDATANG') }}</span>
                     <h3 style="margin:0 0 4px; font-size:18px; color:#fff;">{{ $upcomingBooking->lapangan?->nama ?? 'Lapangan' }}</h3>
                     <p style="margin:0; font-size:13px; color:#dcfce7;">
                         <i class="fa-regular fa-calendar"></i> {{ $upcomingBooking->booking_date?->format('d M Y') }} &nbsp;·&nbsp;
@@ -624,7 +622,7 @@
             </div>
             <div style="display:flex; gap:10px;">
                 <a href="{{ route('user.bookings') }}" class="u-btn" style="background:#fff; color:#0b5133; text-decoration:none; padding:10px 18px; font-size:13px; border-radius:10px; font-weight:800;">
-                    Tiket Saya
+                    {{ __('Tiket Saya') }}
                 </a>
             </div>
         </div>
@@ -637,8 +635,8 @@
                 <i class="fa-solid fa-location-crosshairs"></i>
             </div>
             <div>
-                <strong style="display:block; font-size:14px; color:#123b28;">Venue Terdekat</strong>
-                <small style="color:#71847a; font-size:11px;">Cari dengan GPS</small>
+                <strong style="display:block; font-size:14px; color:#123b28;">{{ __('Venue Terdekat') }}</strong>
+                <small style="color:#71847a; font-size:11px;">{{ __('Cari dengan GPS') }}</small>
             </div>
         </a>
 
@@ -647,8 +645,8 @@
                 <i class="fa-solid fa-futbol"></i>
             </div>
             <div>
-                <strong style="display:block; font-size:14px; color:#123b28;">Sewa Lapangan</strong>
-                <small style="color:#71847a; font-size:11px;">Futsal, Badminton, dll</small>
+                <strong style="display:block; font-size:14px; color:#123b28;">{{ __('Sewa Lapangan') }}</strong>
+                <small style="color:#71847a; font-size:11px;">{{ __('Futsal, Badminton, dll') }}</small>
             </div>
         </a>
 
@@ -657,7 +655,7 @@
                 <i class="fa-solid fa-users"></i>
             </div>
             <div>
-                <strong style="display:block; font-size:14px; color:#123b28;">Open Match</strong>
+                <strong style="display:block; font-size:14px; color:#123b28;">{{ __('Open Match') }}</strong>
                 <small style="color:#71847a; font-size:11px;">Gabung teman main</small>
             </div>
         </a>
@@ -721,7 +719,7 @@
                     Venue pilihan
                 </h2>
                 <p>
-                    Pilih nama perusahaan atau venue untuk melihat
+                    Pilih venue untuk melihat
                     lapangan yang tersedia di dalamnya.
                 </p>
             </div>
@@ -752,7 +750,7 @@
 
                     $sports = array_filter($sports, fn($sport) => is_string($sport) && trim($sport) !== '');
 
-                    $companyName = $venue->company_name ?: $venue->name;
+                    $venueDisplayName = $venue->name ?: ($venue->company_name ?: 'Venue ArenaSports');
                 @endphp
 
                 <article class="uh-card">
@@ -763,7 +761,7 @@
                         @if($venue->photo)
                             <img
                                 src="{{ asset($venue->photo) }}"
-                                alt="Foto {{ $companyName }}"
+                                alt="Foto {{ $venueDisplayName }}"
                                 loading="lazy"
                             >
                         @else
@@ -790,12 +788,12 @@
                             @endif
                         </span>
 
-                        <h3>{{ $companyName }}</h3>
+                        <h3>{{ $venueDisplayName }}</h3>
 
                         @if($venue->company_name && $venue->name !== $venue->company_name)
                             <p class="uh-meta">
-                                <i class="fa-solid fa-location-crosshairs"></i>
-                                <span>{{ $venue->name }}</span>
+                                <i class="fa-solid fa-building"></i>
+                                <span>{{ $venue->company_name }}</span>
                             </p>
                         @endif
 

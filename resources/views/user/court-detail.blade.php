@@ -7,12 +7,12 @@
 <div class="u-section-head">
     <div>
         <h2>{{ $lapangan->nama }}</h2>
-        <p>Detail venue sebelum melakukan pemesanan.</p>
+        <p>{{ __('Detail venue sebelum melakukan pemesanan.') }}</p>
     </div>
 
     <a class="u-btn ghost"
        href="{{ $lapangan->venue ? route('user.venues.show', $lapangan->venue) : route('user.venues') }}">
-        Kembali ke venue
+        {{ __('Kembali ke venue') }}
     </a>
 </div>
 
@@ -85,7 +85,7 @@
                 @empty
                     <div class="u-gallery-empty">
                         <i class="fa-solid fa-futbol"></i>
-                        <span>Foto lapangan belum tersedia</span>
+                        <span>{{ __('Foto lapangan belum tersedia') }}</span>
                     </div>
                 @endforelse
 
@@ -159,7 +159,7 @@
 
     <div style="font-size:12px;color:#64748b;margin-bottom:5px">
         <i class="fa-solid fa-building"></i>
-        Lapangan ini berada di venue
+        {{ __('Lapangan ini berada di venue') }}
     </div>
 
     @if($lapangan->venue)
@@ -177,9 +177,7 @@
 
     @else
 
-        <span style="color:#64748b">
-            Venue belum tersedia
-        </span>
+        <span style="color:#64748b">{{ __('Venue belum tersedia') }}</span>
 
     @endif
 
@@ -191,11 +189,11 @@
 </p>
 
             <p>
-                {{ $lapangan->deskripsi ?: 'Belum ada deskripsi untuk lapangan ini.' }}
+                {{ $lapangan->deskripsi ?: __('Belum ada deskripsi untuk lapangan ini.') }}
             </p>
 
             @if($lapangan->fasilitas)
-                <p><strong>Fasilitas</strong></p>
+                <p><strong>{{ __('Fasilitas') }}</strong></p>
 
                 <p>
                     {{ implode(', ', (array) $lapangan->fasilitas) }}
@@ -219,11 +217,10 @@
 
         <div class="u-card-body">
 
-            <h3>Booking lapangan</h3>
+            <h3>{{ __('Booking lapangan') }}</h3>
 
             <p class="u-meta">
-                Pilih tanggal, waktu mulai, durasi, dan metode pembayaran.
-                Jadwal akan diperiksa sebelum booking dibuat.
+                {{ __('Pilih tanggal, waktu mulai, durasi, dan metode pembayaran. Jadwal akan diperiksa sebelum booking dibuat.') }}
             </p>
 
             <form
@@ -235,7 +232,7 @@
 
                 {{-- TANGGAL BOOKING --}}
                 <div class="u-field full">
-                    <label>Tanggal bermain</label>
+                    <label>{{ __('Tanggal bermain') }}</label>
 
                     <input
                         id="booking-date"
@@ -250,7 +247,7 @@
 
                 {{-- JAM MULAI --}}
                 <div class="u-field">
-                    <label>Jam mulai</label>
+                    <label>{{ __('Jam mulai') }}</label>
 
                     <input
                         id="booking-start"
@@ -264,7 +261,7 @@
 
                 {{-- JAM SELESAI / DURASI --}}
                 <div class="u-field">
-                    <label>Sampai Jam (Jam Selesai)</label>
+                    <label>{{ __('Sampai Jam (Jam Selesai)') }}</label>
 
                     <select id="booking-end-time">
                         {{-- Opsi jam selesai diisi secara dinamis sesuai jam mulai --}}
@@ -273,14 +270,14 @@
                     <input type="hidden" id="booking-hours" name="hours" value="{{ old('hours', $bookingDraft['hours'] ?? 1) }}">
 
                     <small id="booking-end-display">
-                        Pilih jam mulai dan jam selesai bermain.
+                        {{ __('Pilih jam mulai dan jam selesai bermain.') }}
                     </small>
                 </div>
 
 
                 {{-- KETERSEDIAAN JADWAL --}}
                 <div class="u-field full">
-                    <label>Ketersediaan waktu</label>
+                    <label>{{ __('Ketersediaan waktu') }}</label>
 
                     <div
                         id="availability-grid"
@@ -288,29 +285,29 @@
                     </div>
 
                     <small style="display:flex;gap:14px;margin-top:8px;flex-wrap:wrap">
-    <span><i style="color:#16a34a">●</i> Tersedia</span>
-    <span><i style="color:#dc2626">●</i> Sudah dipesan</span>
-    <span><i style="color:#9ca3af">●</i> Waktu berlalu</span>
+    <span><i style="color:#16a34a">●</i> {{ __('Tersedia') }}</span>
+    <span><i style="color:#dc2626">●</i> {{ __('Sudah dipesan') }}</span>
+    <span><i style="color:#9ca3af">●</i> {{ __('Waktu berlalu') }}</span>
 </small>
                 </div>
 
 
                 {{-- METODE PEMBAYARAN --}}
                 <div class="u-field full">
-                    <label>Metode pembayaran</label>
+                    <label>{{ __('Metode pembayaran') }}</label>
 
                     <select name="payment_method" required>
 
                         <option
                             value="Midtrans"
                             @selected(old('payment_method', $bookingDraft['payment_method'] ?? 'Midtrans') === 'Midtrans')>
-                            Pembayaran Online melalui Midtrans
+                            {{ __('Pembayaran Online melalui Midtrans') }}
                         </option>
 
                         <option
                             value="Cash"
                             @selected(old('payment_method') === 'Cash')>
-                            Cash / Bayar di Tempat
+                            {{ __('Cash / Bayar di Tempat') }}
                         </option>
 
                     </select>
@@ -328,7 +325,7 @@
                     type="submit"
                     class="u-btn"
                     style="grid-column:1/-1">
-                    Booking &amp; Bayar Sekarang
+                    {{ __('Booking & Bayar Sekarang') }}
                 </button>
 
             </form>
@@ -352,7 +349,7 @@
         <div>
             <h3 style="margin:0 0 6px; font-size:20px; color:#143e26; display:flex; align-items:center; gap:8px;">
                 <i class="fa-solid fa-comments" style="color:#168653;"></i>
-                Ulasan &amp; Penilaian Pemain
+                {{ __('Ulasan & Penilaian Pemain') }}
             </h3>
             <p style="margin:0; color:#62796e; font-size:13px;">
                 Pengalaman nyata dari para pemain yang pernah menyewa {{ $lapangan->nama }}.

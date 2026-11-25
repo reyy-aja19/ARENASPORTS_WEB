@@ -6,8 +6,8 @@
 {{-- HEADER HALAMAN --}}
 <div class="u-section-head">
     <div>
-        <h2>Cari lapangan</h2>
-        <p>Temukan lapangan futsal, badminton, atau olahraga lainnya yang cocok untukmu.</p>
+        <h2>{{ __('Cari lapangan') }}</h2>
+        <p>{{ __('Temukan lapangan futsal, badminton, atau olahraga lainnya yang cocok untukmu.') }}</p>
     </div>
 </div>
 
@@ -19,11 +19,11 @@
         type="text"
         name="q"
         value="{{ request('q') }}"
-        placeholder="Cari nama lapangan atau lokasi..."
+        placeholder="{{ __('Cari nama lapangan atau lokasi...') }}"
     >
 
     <select name="jenis" style="max-width:180px">
-        <option value="">Semua olahraga</option>
+        <option value="">{{ __('Semua olahraga') }}</option>
 
         <option value="Futsal" @selected(request('jenis') === 'Futsal')>
             Futsal
@@ -36,7 +36,7 @@
 
     <button class="u-btn" type="submit">
         <i class="fa-solid fa-magnifying-glass"></i>
-        Cari
+        {{ __('Cari') }}
     </button>
 
 </form>
@@ -163,26 +163,17 @@
                     <i class="fa-solid fa-building"></i>
 
                     <span>
-                        Venue:
+                        {{ __('Venue:') }}
 
                         @if($court->venue)
 
-                            <a
-                                href="{{ route('user.venues.show', $court->venue) }}"
-                                style="
-                                    color:#16a36b;
-                                    font-weight:700;
-                                    text-decoration:none;
-                                "
-                            >
+                            <a href="{{ route('user.venues.show', $court->venue) }}" style="color:#16a36b;font-weight:700;text-decoration:none;">
                                 {{ $court->venue->name }}
                             </a>
 
                         @else
 
-                            <span style="color:#94a3b8">
-                                Belum terhubung dengan venue
-                            </span>
+                            <span style="color:#94a3b8">{{ __('Belum terhubung dengan venue') }}</span>
 
                         @endif
 
@@ -224,7 +215,7 @@
                     Rp {{ number_format($court->harga, 0, ',', '.') }}
 
                     <span class="u-meta">
-                        / jam
+                        {{ __('/ jam') }}
                     </span>
 
                 </div>
@@ -241,7 +232,7 @@
                     "
                     href="{{ route('courts.detail', $court) }}"
                 >
-                    Lihat detail &amp; booking
+                    {{ __('Lihat detail & booking') }}
                 </a>
 
             </div>
@@ -255,9 +246,9 @@
 
             <i class="fa-solid fa-magnifying-glass"></i>
 
-            <strong>Lapangan tidak ditemukan</strong>
+            <strong>{{ __('Lapangan tidak ditemukan') }}</strong>
 
-            Coba kata kunci atau jenis olahraga lain.
+            {{ __('Coba kata kunci atau jenis olahraga lain.') }}
 
         </div>
 

@@ -23,6 +23,7 @@ return [
     'firebase' => [
         'api_key' => env('FIREBASE_API_KEY', 'AIzaSyCDUVRSyECkOnxuu-gALGUqR5sRqonDWnw'),
         'project_id' => env('FIREBASE_PROJECT_ID', 'penyewaan-lapangan-64a01'),
+        'credentials' => env('FIREBASE_CREDENTIALS', storage_path('app/firebase-service-account.json')),
     ],
 
     /*

@@ -1,10 +1,10 @@
 
 <!DOCTYPE html>
-<html lang="id">
+<html lang="{{ app()->getLocale() }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Atur Password Baru · ARENASPORTS</title>
+    <title>{{ __('Atur Password Baru') }} · ARENASPORTS</title>
     <link rel="stylesheet" href="{{ asset('user-ui.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -67,8 +67,8 @@
 </head>
 <body>
     <main class="reset-card">
-        <h1>Atur Password Baru</h1>
-        <p>Buat password baru untuk mengamankan akun ARENASPORTS kamu.</p>
+        <h1>{{ __('Atur Password Baru') }}</h1>
+        <p>{{ __('Buat password baru untuk mengamankan akun ARENASPORTS kamu.') }}</p>
 
         @if ($errors->any())
             <div class="reset-alert">
@@ -81,7 +81,7 @@
 
             <input type="hidden" name="token" value="{{ $token }}">
 
-            <label for="email">Alamat Email</label>
+            <label for="email">{{ __('Alamat email') }}</label>
             <input
                 type="email"
                 id="email"
@@ -91,29 +91,29 @@
                 readonly
             >
 
-            <label for="password">Password Baru</label>
+            <label for="password">{{ __('Password Baru') }}</label>
             <input
                 type="password"
                 id="password"
                 name="password"
-                placeholder="Minimal 8 karakter"
+                placeholder="{{ __('Minimal 8 karakter') }}"
                 minlength="8"
                 required
                 autocomplete="new-password"
             >
 
-            <label for="password_confirmation">Konfirmasi Password Baru</label>
+            <label for="password_confirmation">{{ __('Konfirmasi Password Baru') }}</label>
             <input
                 type="password"
                 id="password_confirmation"
                 name="password_confirmation"
-                placeholder="Ulangi password baru"
+                placeholder="{{ __('Ulangi password baru') }}"
                 minlength="8"
                 required
                 autocomplete="new-password"
             >
 
-            <button type="submit">Simpan Password Baru</button>
+            <button type="submit">{{ __('Simpan Password Baru') }}</button>
         </form>
     </main>
 @include('layouts.partials.site-footer')
