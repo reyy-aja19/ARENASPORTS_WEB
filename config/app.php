@@ -55,6 +55,12 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+     * Paksa semua URL yang di-generate (route(), url()) ke bentuk https,
+     * termasuk URL pengalihan Midtrans setelah pembayaran.
+     */
+    'force_https' => env('APP_FORCE_HTTPS', false),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

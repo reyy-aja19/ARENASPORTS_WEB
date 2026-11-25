@@ -389,6 +389,7 @@ class MidtransController extends Controller
             'statusUrl' => route('user.payments.status', $payment),
             'statusJsonUrl' => route('user.payments.status-json', $payment),
             'successUrl' => route('user.payments.success', $payment),
+            'failureUrl' => route('user.payments.status', $payment),
         ]);
     }
 

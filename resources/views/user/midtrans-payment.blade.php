@@ -108,6 +108,8 @@
     const token = @json($payment->snap_token);
     const statusUrl = @json($statusUrl);
     const statusJsonUrl = @json($statusJsonUrl);
+    const successUrl = @json($successUrl ?? null);
+    const failureUrl = @json($failureUrl ?? null);
     const statusEl = document.getElementById('payStatus');
     const payButton = document.getElementById('payNow');
     let opening = false;
@@ -125,9 +127,9 @@
                 });
                 if (response.ok) {
                     const data = await response.json();
-                    if (data.paid && data.redirect_url) {
+                    if (data.paid && (data.redirect_url || successUrl)) {
                         setStatus('Pembayaran berhasil. Mengalihkan ke bukti pembayaran...');
-                        window.location.href = data.redirect_url;
+                        window.location.href = data.redirect_url || successUrl;
                         return true;
                     }
                 }
@@ -168,6 +170,9 @@
                 opening = false;
                 setStatus('Pembayaran gagal. Silakan coba lagi atau gunakan metode lain.');
                 console.error('Midtrans error', result);
+                if (failureUrl) {
+                    window.location.href = failureUrl;
+                }
             },
             onClose: function () {
                 opening = false;
