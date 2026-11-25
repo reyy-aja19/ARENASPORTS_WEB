@@ -77,7 +77,7 @@ class AuthController extends BaseApiController
 
         $rateKey = 'api-login:'.strtolower($identifier);
 
-        if (RateLimiter::tooManyAttempts($rateKey, 10)) {
+        if (RateLimiter::tooManyAttempts($rateKey, 20)) {
             return $this->fail('Terlalu banyak percobaan masuk. Coba lagi dalam 10 menit.', 429);
         }
         RateLimiter::hit($rateKey, 600);
@@ -162,7 +162,7 @@ class AuthController extends BaseApiController
 
         $emailKey = 'api-forgot:'.$data['email'];
 
-        if (RateLimiter::tooManyAttempts($emailKey, 5)) {
+        if (RateLimiter::tooManyAttempts($emailKey, 10)) {
             return $this->fail('Terlalu banyak permintaan reset password. Coba lagi dalam 10 menit.', 429);
         }
         RateLimiter::hit($emailKey, 600);
