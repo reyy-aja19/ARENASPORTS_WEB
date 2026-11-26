@@ -510,6 +510,54 @@ class MidtransController extends Controller
     }
 
     /**
+     * FINISH REDIRECT DARI DASHBOARD MIDTRANS
+     *
+     * Endpoint statis untuk transaksi yang tidak menyertakan callbacks.finish
+     * (misalnya payment link dari dashboard). Midtrans menambahkan query
+     * order_id, status_code, dan transaction_status secara otomatis.
+     */
+    public function finishRedirect(Request $request): RedirectResponse
+    {
+        $orderId = trim((string) $request->query('order_id', ''));
+        $transactionId = trim((string) $request->query('transaction_id', ''));
+
+        if ($orderId === '') {
+            return redirect()
+                ->route('user.bookings')
+                ->with('error', 'Transaksi pembayaran tidak dikenali.');
+        }
+
+        $payment = $this->locatePayment($orderId, $transactionId);
+
+        if (! $payment) {
+            Log::warning('Finish redirect Midtrans: pembayaran tidak ditemukan.', [
+                'order_id' => $orderId,
+                'transaction_id' => $transactionId,
+            ]);
+
+            return redirect()
+                ->route('user.bookings')
+                ->with('error', 'Pembayaran tidak ditemukan. Silakan periksa riwayat booking.');
+        }
+
+        $payment->loadMissing(['booking', 'extension']);
+
+        $userId = (int) $request->session()->get('admin_user_id');
+        $ownerId = (int) (
+            $payment->user_id
+            ?: ($payment->booking?->user_id ?? $payment->extension?->user_id)
+        );
+
+        if ($userId < 1 || $ownerId !== $userId) {
+            return redirect()
+                ->route('login')
+                ->with('error', 'Silakan login untuk melihat status pembayaran.');
+        }
+
+        return redirect()->route('user.payments.status', $payment);
+    }
+
+    /**
      * NOTIFIKASI MIDTRANS
      */
     public function notification(Request $request): JsonResponse

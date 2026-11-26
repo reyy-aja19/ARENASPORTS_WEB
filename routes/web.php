@@ -133,6 +133,11 @@ Route::post('/payments/midtrans/notification', [
     'notification'
 ])->name('midtrans.notification');
 
+Route::get('/payments/midtrans/finish', [
+    MidtransController::class,
+    'finishRedirect'
+])->name('midtrans.finish');
+
 /*
 |--------------------------------------------------------------------------
 | ROUTE PUBLIK MARKETPLACE
