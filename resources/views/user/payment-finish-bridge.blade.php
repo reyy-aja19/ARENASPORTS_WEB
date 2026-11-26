@@ -25,8 +25,7 @@
         <h1>{{ $pending ? 'Pembayaran Sedang Diproses' : 'Status Pembayaran' }}</h1>
         <p>{{ $message }}</p>
         <div class="actions">
-            <a class="btn btn-primary" href="{{ $loginUrl }}">Login ke ArenaSports</a>
-            <a class="btn btn-secondary" href="{{ url('/') }}">Ke Beranda</a>
+            <a class="btn btn-primary" href="arenasports://home" id="btn-home">Ke Beranda</a>
         </div>
         <p class="muted">Jika kamu membuka halaman ini dari aplikasi ArenaSports, kamu bisa kembali ke aplikasi dan menunggu status diperbarui otomatis.</p>
     </div>
