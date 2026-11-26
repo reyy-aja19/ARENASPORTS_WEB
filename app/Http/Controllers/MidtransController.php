@@ -516,15 +516,16 @@ class MidtransController extends Controller
      * (misalnya payment link dari dashboard). Midtrans menambahkan query
      * order_id, status_code, dan transaction_status secara otomatis.
      */
-    public function finishRedirect(Request $request): RedirectResponse
+    public function finishRedirect(Request $request): RedirectResponse|View
     {
         $orderId = trim((string) $request->query('order_id', ''));
         $transactionId = trim((string) $request->query('transaction_id', ''));
 
         if ($orderId === '') {
-            return redirect()
-                ->route('user.bookings')
-                ->with('error', 'Transaksi pembayaran tidak dikenali.');
+            return $this->finishRedirectBridge(
+                'Transaksi pembayaran tidak dikenali.',
+                false
+            );
         }
 
         $payment = $this->locatePayment($orderId, $transactionId);
@@ -535,9 +536,10 @@ class MidtransController extends Controller
                 'transaction_id' => $transactionId,
             ]);
 
-            return redirect()
-                ->route('user.bookings')
-                ->with('error', 'Pembayaran tidak ditemukan. Silakan periksa riwayat booking.');
+            return $this->finishRedirectBridge(
+                'Pembayaran tidak ditemukan. Silakan periksa riwayat booking.',
+                false
+            );
         }
 
         $payment->loadMissing(['booking', 'extension']);
@@ -549,12 +551,30 @@ class MidtransController extends Controller
         );
 
         if ($userId < 1 || $ownerId !== $userId) {
-            return redirect()
-                ->route('login')
-                ->with('error', 'Silakan login untuk melihat status pembayaran.');
+            // Jangan redirect ke login: mobile WebView akan menampilkan flash
+            // halaman login. Tampilkan bridge page; app mobile mendeteksi /finish
+            // dan mengecek status via API.
+            return $this->finishRedirectBridge(
+                'Pembayaran sedang diproses. Jika kamu memakai aplikasi, status akan diperbarui otomatis.',
+                true,
+                $payment
+            );
         }
 
         return redirect()->route('user.payments.status', $payment);
+    }
+
+    private function finishRedirectBridge(
+        string $message,
+        bool $pending,
+        ?Payment $payment = null
+    ): View {
+        return view('user.payment-finish-bridge', [
+            'message' => $message,
+            'pending' => $pending,
+            'payment' => $payment,
+            'loginUrl' => route('login'),
+        ]);
     }
 
     /**

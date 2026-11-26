@@ -77,16 +77,19 @@ class MidtransFinishRedirectTest extends TestCase
             ->assertRedirect(route('user.payments.status', $payment));
     }
 
-    public function test_finish_redirect_requires_login_for_guest(): void
+    public function test_finish_redirect_shows_bridge_for_guest_without_login_flash(): void
     {
         $payment = $this->makePayment();
 
         $this->get(route('midtrans.finish', [
             'order_id' => $payment->midtrans_order_id,
-        ]))->assertRedirect(route('login'));
+        ]))
+            ->assertOk()
+            ->assertViewIs('user.payment-finish-bridge')
+            ->assertSee('kembali ke aplikasi', false);
     }
 
-    public function test_finish_redirect_rejects_other_users_payment(): void
+    public function test_finish_redirect_shows_bridge_for_other_user(): void
     {
         $payment = $this->makePayment();
         $otherUser = User::factory()->create();
@@ -95,21 +98,22 @@ class MidtransFinishRedirectTest extends TestCase
             ->get(route('midtrans.finish', [
                 'order_id' => $payment->midtrans_order_id,
             ]))
-            ->assertRedirect(route('login'));
+            ->assertOk()
+            ->assertViewIs('user.payment-finish-bridge');
     }
 
     public function test_finish_redirect_handles_unknown_order_id(): void
     {
         $this->withSession(['admin_user_id' => 1])
             ->get(route('midtrans.finish', ['order_id' => 'UNKNOWN']))
-            ->assertRedirect(route('user.bookings'))
-            ->assertSessionHas('error');
+            ->assertOk()
+            ->assertViewIs('user.payment-finish-bridge');
     }
 
     public function test_finish_redirect_without_order_id_does_not_error(): void
     {
         $this->get(route('midtrans.finish'))
-            ->assertRedirect(route('user.bookings'))
-            ->assertSessionHas('error');
+            ->assertOk()
+            ->assertViewIs('user.payment-finish-bridge');
     }
 }
