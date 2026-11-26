@@ -522,9 +522,12 @@ class MidtransController extends Controller
         $transactionId = trim((string) $request->query('transaction_id', ''));
 
         if ($orderId === '') {
+            // Beberapa alur redirect Midtrans/mobile tidak selalu menyertakan
+            // order_id. Tampilkan bridge aman agar WebView mobile tidak flash
+            // ke login dan aplikasi dapat melanjutkan polling status via API.
             return $this->finishRedirectBridge(
-                'Transaksi pembayaran tidak dikenali.',
-                false
+                'Pembayaran sedang diproses. Jika kamu memakai aplikasi, status akan diperbarui otomatis.',
+                true
             );
         }
 

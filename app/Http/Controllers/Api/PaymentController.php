@@ -201,6 +201,9 @@ class PaymentController extends BaseApiController
                     'email' => $user->email ?: '',
                     'phone' => $user->phone ?: '',
                 ],
+                'callbacks' => [
+                    'finish' => route('midtrans.finish'),
+                ],
                 'item_details' => [[
                     'id' => $itemId,
                     'price' => $amount,
