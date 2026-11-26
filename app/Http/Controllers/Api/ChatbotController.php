@@ -20,7 +20,7 @@ class ChatbotController extends BaseApiController
         $lng = (float) $data['longitude'];
 
         $venues = Venue::withCount([
-            'lapangans' => fn ($query) => $query->where('status', 'Tersedia'),
+            'lapangans' => fn ($query) => $query->operational(),
         ])
             ->where('status', 'Aktif')
             ->whereNotNull('latitude')

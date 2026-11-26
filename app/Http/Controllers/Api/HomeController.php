@@ -21,7 +21,7 @@ class HomeController extends BaseApiController
         $venueCount = Venue::where('status', 'Aktif')->count();
 
         $venues = Venue::withCount([
-            'lapangans' => fn ($q) => $q->where('status', 'Tersedia'),
+            'lapangans' => fn ($q) => $q->operational(),
         ])
             ->where('status', 'Aktif')
             ->latest()
@@ -31,7 +31,7 @@ class HomeController extends BaseApiController
             ->values();
 
         $courts = Lapangan::with('venue')
-            ->where('status', 'Tersedia')
+            ->operational()
             ->where(function ($query) {
                 $query->whereNull('venue_id')
                     ->orWhereHas('venue', fn ($venue) => $venue->where('status', 'Aktif'));

@@ -36,6 +36,10 @@ class VenueApplication extends Model
         'facilities',
         'applicant_relationship',
         'responsibility_agreed_at',
+        'entity_type',
+        'opening_time',
+        'closing_time',
+        'operating_days',
     ];
 
     protected function casts(): array
@@ -46,6 +50,7 @@ class VenueApplication extends Model
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'facilities' => 'array',
+            'operating_days' => 'array',
             'responsibility_agreed_at' => 'datetime',
         ];
     }

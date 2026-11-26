@@ -392,293 +392,507 @@
         </form>
     @endif
 
-    <div class="venue-profile-card">
+@php
+    $galleryPaths = collect(is_array($venue->gallery) ? $venue->gallery : [])
+        ->filter(fn ($item) => is_string($item) && trim($item) !== '')
+        ->values();
 
-        <div class="venue-section-heading">
-            <div class="venue-section-icon">▣</div>
-            <div>
-                <h3>Informasi Venue</h3>
-                <p>Lengkapi informasi venue agar mudah ditemukan oleh pelanggan.</p>
+    if ($venue->photo && !$galleryPaths->contains($venue->photo)) {
+        $galleryPaths->prepend($venue->photo);
+    }
+
+    $galleryPaths = $galleryPaths->unique()->values();
+
+    $pathToUrl = function (?string $path) use ($venue) {
+        if (!$path) {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+
+        $path = ltrim($path, '/');
+
+        if (str_starts_with($path, 'storage/')) {
+            return asset($path);
+        }
+
+        if (str_starts_with($path, 'uploads/')) {
+            return asset($path);
+        }
+
+        return asset('storage/' . $path);
+    };
+
+    $selectedOperatingDays = old('operating_days', $venue->operating_days_list ?? []);
+    if (!is_array($selectedOperatingDays)) {
+        $selectedOperatingDays = [];
+    }
+
+    $openingTime = old('opening_time', $venue->opening_time ? substr((string) $venue->opening_time, 0, 5) : '');
+    $closingTime = old('closing_time', $venue->closing_time ? substr((string) $venue->closing_time, 0, 5) : '');
+    $selectedEntity = old('entity_type', $venue->entity_type ?: ($venue->company_name ? 'Badan Usaha' : 'Perorangan'));
+    $selectedStatus = old('operational_status', $venue->operational_status ?: 'Beroperasi');
+@endphp
+
+{{-- Ringkasan profil venue --}}
+<div class="venue-profile-card" style="margin-bottom:20px;padding:0;overflow:hidden;">
+    <div style="display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:0;align-items:stretch;">
+        <div style="position:relative;min-height:210px;background:linear-gradient(135deg,#d9f2e1,#b9e6c8);">
+            @if($venue->photo)
+                <img src="{{ $pathToUrl($venue->photo) }}" alt="Foto utama {{ $venue->name }}" style="width:100%;height:100%;object-fit:cover;display:block;min-height:210px;">
+            @else
+                <div style="height:100%;min-height:210px;display:grid;place-items:center;color:#168b50;font-size:44px;">
+                    <i class="fa-solid fa-building"></i>
+                </div>
+            @endif
+            <span style="position:absolute;top:14px;left:14px;padding:7px 12px;border-radius:30px;background:#ffffffed;color:#0b7040;font-size:12px;font-weight:800;">
+                Foto Utama
+            </span>
+        </div>
+
+        <div style="padding:24px 26px;display:flex;flex-direction:column;justify-content:center;gap:10px;">
+            <span style="display:inline-flex;width:max-content;align-items:center;gap:7px;padding:6px 11px;border-radius:30px;background:#e8f8ed;color:#07883e;font-size:12px;font-weight:800;">
+                <i class="fa-solid fa-location-dot"></i> Profil Venue
+            </span>
+            <h2 style="margin:0;font-size:26px;color:#126b38;font-weight:850;">{{ $venue->name }}</h2>
+
+            @if($venue->managed_by)
+                <p style="margin:0;color:#5f7268;font-size:13px;">
+                    <i class="fa-solid fa-user-tie"></i> Dikelola oleh <strong>{{ $venue->managed_by }}</strong>
+                </p>
+            @endif
+
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;">
+                <span style="padding:7px 11px;border-radius:9px;background:#f2f8f4;color:#29523a;font-size:12px;">
+                    <i class="fa-solid fa-futbol"></i> {{ implode(', ', $venue->sports ?? []) ?: 'Olahraga belum diisi' }}
+                </span>
+                <span style="padding:7px 11px;border-radius:9px;background:#f2f8f4;color:#29523a;font-size:12px;">
+                    <i class="fa-regular fa-clock"></i> {{ $venue->operating_hours_text }}
+                </span>
+                <span style="padding:7px 11px;border-radius:9px;background:{{ $venue->is_operating ? '#e3f7e9' : '#fdecec' }};color:{{ $venue->is_operating ? '#087747' : '#b23b3b' }};font-size:12px;font-weight:700;">
+                    <i class="fa-solid fa-store"></i> {{ $venue->operational_status ?: 'Beroperasi' }}
+                </span>
+                <span style="padding:7px 11px;border-radius:9px;background:#f2f8f4;color:#29523a;font-size:12px;">
+                    <i class="fa-regular fa-calendar-days"></i> {{ $venue->operating_days_text }}
+                </span>
+            </div>
+
+            <p style="margin:4px 0 0;color:#6b7d72;font-size:13px;line-height:1.6;">
+                {{ $venue->address ?: 'Alamat venue belum diisi.' }}
+            </p>
+
+            @if($venue->company_information_available)
+                <p style="margin:0;color:#6b7d72;font-size:12px;">
+                    <i class="fa-solid fa-briefcase"></i> {{ $venue->company_name ?: $venue->business_type }}
+                </p>
+            @endif
+        </div>
+    </div>
+</div>
+
+<div class="venue-profile-card">
+
+    <div class="venue-section-heading">
+        <div class="venue-section-icon">▣</div>
+        <div>
+            <h3>Informasi Venue</h3>
+            <p>Lengkapi informasi venue agar mudah ditemukan oleh pelanggan.</p>
+        </div>
+    </div>
+
+    <form
+        method="POST"
+        enctype="multipart/form-data"
+        action="{{ route('admin.venue-profile.update') }}"
+        class="venue-form-grid"
+    >
+        @csrf
+        @method('PUT')
+        <input type="hidden" name="venue_id" value="{{ $venue->id }}">
+
+        {{-- ================= IDENTITAS VENUE ================= --}}
+        <div class="venue-form-group full-width">
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 0 6px;border-top:1px dashed #e3ede6;margin-top:4px;">
+                <span style="width:32px;height:32px;border-radius:9px;background:#e8f8ed;color:#07883e;display:grid;place-items:center;">
+                    <i class="fa-solid fa-building"></i>
+                </span>
+                <div>
+                    <strong style="display:block;color:#164b31;font-size:15px;">Identitas Venue</strong>
+                    <small style="color:#7b8b81;">Nama venue selalu menjadi judul utama, bukan nama perusahaan.</small>
+                </div>
             </div>
         </div>
 
-        <form
-            method="POST"
-            enctype="multipart/form-data"
-            action="{{ route('admin.venue-profile.update') }}"
-            class="venue-form-grid"
-        >
-            @csrf
-            @method('PUT')
-            <input type="hidden" name="venue_id" value="{{ $venue->id }}">
+        <div class="venue-form-group">
+            <label for="name">
+                Nama Venue <span class="required">*</span>
+            </label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                value="{{ old('name', $venue->name) }}"
+                maxlength="150"
+                placeholder="Contoh: Venue Rajasinga"
+                required
+            >
+            @error('name')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
 
-            <div class="venue-photo-upload">
-                <label for="photo" style="font-weight:750;color:#174d2d;">Foto Utama Venue</label>
-                @if($venue->photo)
-                    <img
-                        id="venue-photo-preview"
-                        class="venue-photo-preview"
-                        src="{{ $venue->photo_url ?? asset($venue->photo) }}"
-                        alt="Foto {{ $venue->name }}"
-                    >
-                @else
-                    <img
-                        id="venue-photo-preview"
-                        class="venue-photo-preview"
-                        src=""
-                        alt="Pratinjau foto venue"
-                        style="display:none;"
-                    >
-                    <div id="venue-photo-empty" style="max-width:420px;height:150px;margin:12px 0;display:flex;align-items:center;justify-content:center;gap:10px;border-radius:12px;background:#e8f7ec;color:#168653;">
-                        <i class="fa-solid fa-image" style="font-size:30px;"></i>
-                        <span>Belum ada foto venue</span>
+        <div class="venue-form-group">
+            <label for="contact_phone">Nomor Kontak Venue</label>
+            <input
+                type="text"
+                id="contact_phone"
+                name="contact_phone"
+                value="{{ old('contact_phone', $venue->contact_phone) }}"
+                maxlength="30"
+                placeholder="Contoh: 081234567890"
+            >
+            @error('contact_phone')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
+
+        <div class="venue-form-group full-width">
+            <label for="address">
+                Alamat Lengkap Venue <span class="required">*</span>
+            </label>
+            <input
+                type="text"
+                id="address"
+                name="address"
+                value="{{ old('address', $venue->address) }}"
+                maxlength="1000"
+                placeholder="Masukkan alamat lengkap venue"
+                required
+            >
+            <span class="venue-form-help">Alamat venue berbeda dengan alamat perusahaan.</span>
+            @error('address')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
+
+        <div class="venue-form-group">
+            <label for="city">Kota</label>
+            <input type="text" id="city" name="city" value="{{ old('city', $venue->city) }}" maxlength="100">
+        </div>
+
+        <div class="venue-form-group">
+            <label for="province">Provinsi</label>
+            <input type="text" id="province" name="province" value="{{ old('province', $venue->province) }}" maxlength="100">
+        </div>
+
+        <div class="venue-form-group full-width">
+            <label for="description">Deskripsi Venue</label>
+            <textarea
+                id="description"
+                name="description"
+                rows="5"
+                placeholder="Ceritakan fasilitas, keunggulan, dan informasi venue Anda..."
+            >{{ old('description', $venue->description) }}</textarea>
+            @error('description')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
+
+        <div class="venue-sports-section">
+            <div class="venue-sports-title">Jenis Olahraga</div>
+            <div class="venue-sports-description">Pilih jenis olahraga yang tersedia di venue.</div>
+            @php
+                $selectedSports = old('sports', $venue->sports ?? []);
+                if (!is_array($selectedSports)) {
+                    $selectedSports = [];
+                }
+            @endphp
+            <div class="venue-sports-grid">
+                @foreach(['Badminton', 'Futsal'] as $sport)
+                    <div class="venue-sport-option">
+                        <input
+                            type="checkbox"
+                            id="sport_{{ Str::slug($sport) }}"
+                            name="sports[]"
+                            value="{{ $sport }}"
+                            @checked(in_array($sport, $selectedSports))
+                        >
+                        <label for="sport_{{ Str::slug($sport) }}">{{ $sport }}</label>
                     </div>
-                @endif
-                <input
-                    type="file"
-                    id="photo"
-                    name="photo"
-                    accept="image/jpeg,image/png,image/webp"
-                >
-                <div class="venue-form-help">
-                    Unggah foto depan venue atau fasilitas utama. Format JPG, PNG, atau WEBP, maksimal 5 MB.
-                    Foto ini akan ditampilkan pada halaman Temukan Venue.
-                </div>
-                @error('photo')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
+                @endforeach
             </div>
+            @error('sports')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
 
-            <div class="venue-form-group full-width"><label for="company_name">Nama Perusahaan / Usaha</label><input type="text" id="company_name" name="company_name" value="{{ old('company_name', $venue->company_name) }}" maxlength="180"></div>
-            <div class="venue-form-group"><label for="business_type">Jenis Badan Usaha</label><input type="text" id="business_type" name="business_type" value="{{ old('business_type', $venue->business_type) }}" maxlength="80"></div>
-            <div class="venue-form-group"><label for="nib">Nomor NIB</label><input type="text" id="nib" name="nib" value="{{ old('nib', $venue->nib) }}" maxlength="100"></div>
-            <div class="venue-form-group full-width"><label for="company_address">Alamat Perusahaan</label><textarea id="company_address" name="company_address" rows="2">{{ old('company_address', $venue->company_address) }}</textarea></div>
-            <div class="venue-form-group"><label for="company_phone">Telepon Perusahaan</label><input type="text" id="company_phone" name="company_phone" value="{{ old('company_phone', $venue->company_phone) }}" maxlength="30"></div>
-            <div class="venue-form-group full-width"><label for="company_description">Deskripsi Perusahaan</label><textarea id="company_description" name="company_description" rows="3">{{ old('company_description', $venue->company_description) }}</textarea></div>
-
-            <div class="venue-form-group">
-                <label for="name">
-                    Nama Venue <span class="required">*</span>
-                </label>
-
-                <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    value="{{ old('name', $venue->name) }}"
-                    maxlength="150"
-                    placeholder="Contoh: Venue Rajasinga"
-                    required
-                >
-
-                @error('name')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
+        <div class="venue-sports-section">
+            <div class="venue-sports-title">Fasilitas Venue</div>
+            <div class="venue-sports-description">Fasilitas umum yang tersedia di area venue.</div>
+            @php $selectedFacilities = old('facilities', $venue->facilities ?? []); @endphp
+            <div class="venue-sports-grid">
+                @foreach(['Parkir motor','Parkir mobil','Toilet','Musholla','Ruang ganti','Ruang tunggu','Tribun','Lampu malam','WiFi','Kantin','Penyewaan perlengkapan'] as $facility)
+                    <div class="venue-sport-option">
+                        <input type="checkbox" id="facility_{{ Str::slug($facility) }}" name="facilities[]" value="{{ $facility }}" @checked(in_array($facility, $selectedFacilities))>
+                        <label for="facility_{{ Str::slug($facility) }}">{{ $facility }}</label>
+                    </div>
+                @endforeach
             </div>
+        </div>
 
-            <div class="venue-form-group">
-                <label for="contact_phone">Nomor Kontak Venue</label>
-
-                <input
-                    type="text"
-                    id="contact_phone"
-                    name="contact_phone"
-                    value="{{ old('contact_phone', $venue->contact_phone) }}"
-                    maxlength="30"
-                    placeholder="Contoh: 081234567890"
-                >
-
-                @error('contact_phone')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
-            </div>
-
-            <div class="venue-form-group full-width">
-                <label for="address">
-                    Alamat Lengkap <span class="required">*</span>
-                </label>
-
-                <input
-                    type="text"
-                    id="address"
-                    name="address"
-                    value="{{ old('address', $venue->address) }}"
-                    maxlength="255"
-                    placeholder="Masukkan alamat lengkap venue"
-                    required
-                >
-
-                @error('address')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
-            </div>
-
-            <div class="venue-form-group">
-                <label for="operating_hours">Jam Operasional</label>
-
-                <input
-                    type="text"
-                    id="operating_hours"
-                    name="operating_hours"
-                    value="{{ old('operating_hours', $venue->operating_hours) }}"
-                    maxlength="150"
-                    placeholder="Contoh: 07.00–23.00 WIB"
-                >
-
-                @error('operating_hours')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
-            </div>
-
-            <div class="venue-form-group">
-                <label for="google_maps_url">Link Google Maps</label>
-
-                <input
-                    type="url"
-                    id="google_maps_url"
-                    name="google_maps_url"
-                    value="{{ old('google_maps_url', $venue->google_maps_url) }}"
-                    maxlength="500"
-                    placeholder="https://maps.google.com/..."
-                >
-
-                <span class="venue-form-help">
-                    Masukkan tautan lokasi venue dari Google Maps.
+        {{-- ================= OPERASIONAL ================= --}}
+        <div class="venue-form-group full-width">
+            <div style="display:flex;align-items:center;gap:10px;padding:18px 0 6px;border-top:1px dashed #e3ede6;margin-top:12px;">
+                <span style="width:32px;height:32px;border-radius:9px;background:#e8f8ed;color:#07883e;display:grid;place-items:center;">
+                    <i class="fa-regular fa-clock"></i>
                 </span>
-
-                @error('google_maps_url')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
-            </div>
-
-            <div class="venue-form-group">
-                <label for="latitude">Koordinat Latitude (GPS)</label>
-                <input
-                    type="number"
-                    step="any"
-                    id="latitude"
-                    name="latitude"
-                    value="{{ old('latitude', $venue->latitude) }}"
-                    placeholder="Contoh: -6.331234"
-                >
-                <span class="venue-form-help">Digunakan untuk pencarian venue terdekat dari pengunjung.</span>
-                @error('latitude')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
-            </div>
-
-            <div class="venue-form-group">
-                <label for="longitude">Koordinat Longitude (GPS)</label>
-                <input
-                    type="number"
-                    step="any"
-                    id="longitude"
-                    name="longitude"
-                    value="{{ old('longitude', $venue->longitude) }}"
-                    placeholder="Contoh: 108.324567"
-                >
-                <span class="venue-form-help">Digunakan untuk pencarian venue terdekat dari pengunjung.</span>
-                @error('longitude')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
-            </div>
-
-            <div class="venue-form-group full-width">
-                <label for="description">Deskripsi Venue</label>
-
-                <textarea
-                    id="description"
-                    name="description"
-                    rows="5"
-                    placeholder="Ceritakan fasilitas, keunggulan, dan informasi venue Anda..."
-                >{{ old('description', $venue->description) }}</textarea>
-
-                @error('description')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
-            </div>
-
-            <div class="venue-sports-section">
-                <div class="venue-sports-title">Jenis Olahraga</div>
-
-                <div class="venue-sports-description">
-                    Pilih jenis olahraga yang tersedia di venue Anda.
+                <div>
+                    <strong style="display:block;color:#164b31;font-size:15px;">Status &amp; Jam Operasional</strong>
+                    <small style="color:#7b8b81;">Status operasional berbeda dari ketersediaan jadwal lapangan.</small>
                 </div>
+            </div>
+        </div>
 
-                @php
-                    $selectedSports = old('sports', $venue->sports ?? []);
+        <div class="venue-form-group">
+            <label for="operational_status">Status Operasional <span class="required">*</span></label>
+            <select id="operational_status" name="operational_status" required>
+                <option value="Beroperasi" @selected($selectedStatus === 'Beroperasi')>Beroperasi</option>
+                <option value="Tutup Sementara" @selected($selectedStatus === 'Tutup Sementara')>Tutup Sementara</option>
+                <option value="Tutup Permanen" @selected($selectedStatus === 'Tutup Permanen')>Tutup Permanen</option>
+            </select>
+            @error('operational_status')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
 
-                    if (!is_array($selectedSports)) {
-                        $selectedSports = [];
-                    }
-                @endphp
+        <div class="venue-form-group">
+            <label for="opening_time">Jam Buka</label>
+            <input type="time" id="opening_time" name="opening_time" value="{{ $openingTime }}">
+        </div>
 
-                <div class="venue-sports-grid">
-                    @foreach([
-                        'Badminton',
-                        'Futsal',
-                        'Basketball',
-                        'Tenis',
-                        'Mini Soccer'
-                    ] as $sport)
+        <div class="venue-form-group">
+            <label for="closing_time">Jam Tutup</label>
+            <input type="time" id="closing_time" name="closing_time" value="{{ $closingTime }}">
+        </div>
 
-                        <div class="venue-sport-option">
-                            <input
-                                type="checkbox"
-                                id="sport_{{ Str::slug($sport) }}"
-                                name="sports[]"
-                                value="{{ $sport }}"
-                                @checked(in_array($sport, $selectedSports))
-                            >
+        <div class="venue-form-group full-width">
+            <label>Hari Operasional</label>
+            <div class="venue-sports-grid">
+                @foreach(['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'] as $day)
+                    <div class="venue-sport-option">
+                        <input type="checkbox" id="day_{{ Str::slug($day) }}" name="operating_days[]" value="{{ $day }}" @checked(in_array($day, $selectedOperatingDays, true))>
+                        <label for="day_{{ Str::slug($day) }}">{{ $day }}</label>
+                    </div>
+                @endforeach
+            </div>
+            <span class="venue-form-help">Kosongkan untuk dianggap beroperasi setiap hari.</span>
+        </div>
 
-                            <label for="sport_{{ Str::slug($sport) }}">
-                                {{ $sport }}
+        {{-- ================= LOKASI PETA ================= --}}
+        <div class="venue-form-group full-width">
+            <div style="display:flex;align-items:center;gap:10px;padding:18px 0 6px;border-top:1px dashed #e3ede6;margin-top:12px;">
+                <span style="width:32px;height:32px;border-radius:9px;background:#e8f8ed;color:#07883e;display:grid;place-items:center;">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                </span>
+                <div>
+                    <strong style="display:block;color:#164b31;font-size:15px;">Lokasi Peta</strong>
+                    <small style="color:#7b8b81;">Tautan dan koordinat untuk pencarian venue terdekat.</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="venue-form-group full-width">
+            <label for="google_maps_url">Link Google Maps</label>
+            <input
+                type="url"
+                id="google_maps_url"
+                name="google_maps_url"
+                value="{{ old('google_maps_url', $venue->google_maps_url) }}"
+                maxlength="500"
+                placeholder="https://maps.google.com/..."
+            >
+            @error('google_maps_url')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
+
+        <div class="venue-form-group">
+            <label for="latitude">Latitude</label>
+            <input type="number" step="any" id="latitude" name="latitude" value="{{ old('latitude', $venue->latitude) }}" placeholder="Contoh: -6.331234">
+            @error('latitude')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
+
+        <div class="venue-form-group">
+            <label for="longitude">Longitude</label>
+            <input type="number" step="any" id="longitude" name="longitude" value="{{ old('longitude', $venue->longitude) }}" placeholder="Contoh: 108.324567">
+            @error('longitude')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
+
+        {{-- ================= INFORMASI PERUSAHAAN ================= --}}
+        <div class="venue-form-group full-width">
+            <div style="display:flex;align-items:center;gap:10px;padding:18px 0 6px;border-top:1px dashed #e3ede6;margin-top:12px;">
+                <span style="width:32px;height:32px;border-radius:9px;background:#eef4ff;color:#3566b8;display:grid;place-items:center;">
+                    <i class="fa-solid fa-briefcase"></i>
+                </span>
+                <div>
+                    <strong style="display:block;color:#164b31;font-size:15px;">Informasi Perusahaan <span style="font-weight:600;color:#7b8b81;">(opsional)</span></strong>
+                    <small style="color:#7b8b81;">Terpisah dari identitas venue. Kosongkan jika dikelola perorangan.</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="venue-form-group">
+            <label for="entity_type">Jenis Usaha</label>
+            <select id="entity_type" name="entity_type">
+                <option value="Perorangan" @selected($selectedEntity === 'Perorangan')>Perorangan</option>
+                <option value="Badan Usaha" @selected($selectedEntity === 'Badan Usaha')>Badan Usaha</option>
+            </select>
+        </div>
+
+        <div class="venue-form-group js-company-field">
+            <label for="business_type">Jenis Badan Usaha</label>
+            <input type="text" id="business_type" name="business_type" value="{{ old('business_type', $venue->business_type) }}" maxlength="80">
+        </div>
+
+        <div class="venue-form-group full-width js-company-field">
+            <label for="company_name">Nama Perusahaan / Usaha</label>
+            <input type="text" id="company_name" name="company_name" value="{{ old('company_name', $venue->company_name) }}" maxlength="180">
+        </div>
+
+        <div class="venue-form-group js-company-field">
+            <label for="nib">Nomor NIB</label>
+            <input type="text" id="nib" name="nib" value="{{ old('nib', $venue->nib) }}" maxlength="100">
+        </div>
+
+        <div class="venue-form-group js-company-field">
+            <label for="company_phone">Telepon Perusahaan</label>
+            <input type="text" id="company_phone" name="company_phone" value="{{ old('company_phone', $venue->company_phone) }}" maxlength="30">
+        </div>
+
+        <div class="venue-form-group full-width js-company-field">
+            <label for="company_address">Alamat Perusahaan</label>
+            <textarea id="company_address" name="company_address" rows="2">{{ old('company_address', $venue->company_address) }}</textarea>
+            <span class="venue-form-help">Alamat perusahaan berbeda dengan alamat venue.</span>
+        </div>
+
+        <div class="venue-form-group full-width js-company-field">
+            <label for="company_description">Deskripsi Perusahaan</label>
+            <textarea id="company_description" name="company_description" rows="3">{{ old('company_description', $venue->company_description) }}</textarea>
+        </div>
+
+        {{-- ================= GALERI FOTO ================= --}}
+        <div class="venue-form-group full-width">
+            <div style="display:flex;align-items:center;gap:10px;padding:18px 0 6px;border-top:1px dashed #e3ede6;margin-top:12px;">
+                <span style="width:32px;height:32px;border-radius:9px;background:#e8f8ed;color:#07883e;display:grid;place-items:center;">
+                    <i class="fa-solid fa-images"></i>
+                </span>
+                <div>
+                    <strong style="display:block;color:#164b31;font-size:15px;">Galeri Foto Venue</strong>
+                    <small style="color:#7b8b81;">Foto utama menjadi cover. Pilih salah satu foto sebagai cover, atau unggah foto baru.</small>
+                </div>
+            </div>
+        </div>
+
+        @if($galleryPaths->count())
+            <div class="venue-form-group full-width">
+                <label>Foto Tersimpan</label>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:8px;">
+                    @foreach($galleryPaths as $path)
+                        @php $isCover = $venue->photo === $path; @endphp
+                        <div style="position:relative;border:2px solid {{ $isCover ? '#12834e' : '#e2eee6' }};border-radius:14px;overflow:hidden;background:#f4fbf6;">
+                            <img src="{{ $pathToUrl($path) }}" alt="Foto venue" style="width:100%;height:120px;object-fit:cover;display:block;">
+                            <label style="display:flex;align-items:center;gap:6px;padding:8px;font-size:11px;color:#29523a;font-weight:700;cursor:pointer;">
+                                <input type="radio" name="cover_photo" value="{{ $path }}" @checked($isCover)>
+                                {{ $isCover ? 'Cover aktif' : 'Jadikan cover' }}
+                            </label>
+                            <label style="display:flex;align-items:center;gap:6px;padding:0 8px 8px;font-size:11px;color:#b23b3b;font-weight:700;cursor:pointer;">
+                                <input type="checkbox" name="remove_gallery[]" value="{{ $path }}">
+                                Hapus foto
                             </label>
                         </div>
-
-                    @endforeach
-                </div>
-
-                @error('sports')
-                    <span class="venue-field-error">{{ $message }}</span>
-                @enderror
-            </div>
-
-            <div class="venue-sports-section">
-                <div class="venue-sports-title">Fasilitas Venue</div>
-                <div class="venue-sports-description">Pilih fasilitas yang tersedia di lokasi.</div>
-                @php $selectedFacilities = old('facilities', $venue->facilities ?? []); @endphp
-                <div class="venue-sports-grid">
-                    @foreach(['Parkir motor','Parkir mobil','Toilet','Musholla','Ruang ganti','Ruang tunggu','Tribun','Lampu malam','WiFi','Kantin','Penyewaan perlengkapan'] as $facility)
-                        <div class="venue-sport-option"><input type="checkbox" id="facility_{{ Str::slug($facility) }}" name="facilities[]" value="{{ $facility }}" @checked(in_array($facility, $selectedFacilities))><label for="facility_{{ Str::slug($facility) }}">{{ $facility }}</label></div>
                     @endforeach
                 </div>
             </div>
-
-            <div class="venue-form-footer">
-                <div class="venue-footer-note">
-                    <span style="color:#e04b4b;">*</span>
-                    Wajib diisi. Pastikan informasi venue sudah benar.
+        @else
+            <div class="venue-form-group full-width">
+                <div style="padding:22px;border:1px dashed #b9d9c2;border-radius:14px;background:#f3fbf5;text-align:center;color:#748279;">
+                    <i class="fa-solid fa-image" style="font-size:28px;color:#168b50;"></i>
+                    <p style="margin:8px 0 0;">Belum ada foto galeri. Unggah foto utama dan beberapa sudut venue.</p>
                 </div>
+            </div>
+        @endif
 
-                <button type="submit" class="venue-save-button">
-                    <span>✓</span>
-                    Simpan Profil Venue
-                </button>
+        <div class="venue-form-group">
+            <label for="photo">Unggah Foto Utama Baru</label>
+            <input type="file" id="photo" name="photo" accept="image/jpeg,image/png,image/webp">
+            <span class="venue-form-help">Foto baru akan menjadi cover. Format JPG/PNG/WEBP maksimal 5 MB.</span>
+            @error('photo')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
+
+        <div class="venue-form-group">
+            <label for="gallery_files">Unggah Foto Galeri Tambahan</label>
+            <input type="file" id="gallery_files" name="gallery_files[]" accept="image/jpeg,image/png,image/webp" multiple>
+            <span class="venue-form-help">Bisa pilih beberapa foto sekaligus (sudut venue, fasilitas, area parkir). Maksimal 20 foto.</span>
+            @error('gallery_files')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+            @error('gallery_files.*')
+                <span class="venue-field-error">{{ $message }}</span>
+            @enderror
+        </div>
+
+        <div class="venue-form-footer">
+            <div class="venue-footer-note">
+                <span style="color:#e04b4b;">*</span>
+                Wajib diisi. Pastikan informasi venue sudah benar.
             </div>
 
-        </form>
-    </div>
+            <button type="submit" class="venue-save-button">
+                <span>✓</span>
+                Simpan Profil Venue
+            </button>
+        </div>
+
+    </form>
+</div>
+
 </div>
 
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const input = document.getElementById('photo');
-    const preview = document.getElementById('venue-photo-preview');
-    const empty = document.getElementById('venue-photo-empty');
+    const entity = document.getElementById('entity_type');
+    const companyFields = document.querySelectorAll('.js-company-field');
 
-    if (!input || !preview) return;
+    function updateCompanyFields() {
+        if (!entity) return;
+
+        const isCompany = entity.value === 'Badan Usaha';
+
+        companyFields.forEach(function (field) {
+            field.style.display = isCompany ? '' : 'none';
+
+            field.querySelectorAll('input, textarea, select').forEach(function (input) {
+                input.disabled = !isCompany;
+            });
+        });
+    }
+
+    if (entity) {
+        entity.addEventListener('change', updateCompanyFields);
+        updateCompanyFields();
+    }
+
+    const input = document.getElementById('photo');
+    if (!input) return;
 
     input.addEventListener('change', function () {
         const file = this.files && this.files[0];
@@ -693,12 +907,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (file.size > 5 * 1024 * 1024) {
             this.value = '';
             alert('Ukuran foto maksimal 5 MB.');
-            return;
         }
-
-        preview.src = URL.createObjectURL(file);
-        preview.style.display = 'block';
-        if (empty) empty.style.display = 'none';
     });
 });
 </script>

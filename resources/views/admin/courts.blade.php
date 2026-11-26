@@ -33,15 +33,15 @@
             <div class="court-info" style="flex:1;">
                 <h3>{{ $court->nama }}</h3>
                 <div class="court-meta">
-                    <span><i class="fa-solid fa-star" style="color:#f4c542"></i> {{ $court->rating }}</span>
-                    <span><i class="fa-solid fa-location-dot"></i> {{ $court->lokasi }}</span>
+                    <span><i class="fa-solid fa-star" style="color:#f4c542"></i> {{ $court->rating ? number_format((float) $court->rating, 1) : 'Baru' }}</span>
+                    <span><i class="fa-solid fa-location-dot"></i> {{ $court->display_location }}</span>
                     <span>{{ $court->jenis }}</span>
-                    <span>Status: {{ $court->status }}</span>
+                    <span>Status: {{ $court->operational_status ?: 'Beroperasi' }}</span>
                 </div>
-                <div class="muted" style="margin-top:8px;">Rp {{ number_format($court->harga,0,',','.') }}/jam</div>
-                @if(in_array($court->status, ['Perawatan', 'Perbaikan']))
+                <div class="muted" style="margin-top:8px;">Rp {{ number_format($court->min_price,0,',','.') }}/jam</div>
+                @if($court->is_under_maintenance)
                     <div style="margin-top:9px;padding:10px 12px;border-radius:10px;background:#fff7e6;border:1px solid #f4d9a6;color:#875b13;font-size:13px;">
-                        <strong><i class="fa-solid fa-screwdriver-wrench"></i> Sedang {{ strtolower($court->status) }}</strong>
+                        <strong><i class="fa-solid fa-screwdriver-wrench"></i> Sedang {{ strtolower($court->operational_status) }}</strong>
                         <div style="margin-top:4px;">{{ $court->maintenance_note ?: 'Belum ada keterangan perbaikan dari admin.' }}</div>
                     </div>
                 @endif

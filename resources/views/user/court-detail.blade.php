@@ -18,46 +18,9 @@
 
 {{-- PROSES FOTO LAPANGAN --}}
 @php
-    $gallery = $lapangan->foto_gallery ?? [];
-
-    // Mendukung gallery dalam bentuk JSON maupun array
-    if (is_string($gallery)) {
-        $gallery = json_decode($gallery, true) ?? [];
-    }
-
-    // Menggabungkan foto utama dan foto gallery
-    $photos = collect(array_merge(
-        [$lapangan->foto],
-        is_array($gallery) ? $gallery : []
-    ))
-    ->filter(fn ($photo) => is_string($photo) && trim($photo) !== '')
-    ->unique()
-    ->values();
-
-    // Membuat URL foto sesuai lokasi penyimpanan
-    $courtPhotos = $photos->map(function ($photo) {
-        $photo = trim($photo);
-
-        // Jika foto menggunakan URL eksternal
-        if (preg_match('/^https?:\/\//i', $photo)) {
-            return $photo;
-        }
-
-        $path = ltrim($photo, '/');
-
-        // Jika path sudah menggunakan storage/
-        if (str_starts_with($path, 'storage/')) {
-            return asset($path);
-        }
-
-        // Jika foto tersimpan di storage/app/public
-        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($path)) {
-            return \Illuminate\Support\Facades\Storage::disk('public')->url($path);
-        }
-
-        // Jika foto tersimpan di folder public
-        return asset($path);
-    })->values();
+    $courtPhotos = collect($lapangan->gallery_urls);
+    $avgRating = $lapangan->reviews_avg_rating ?? $lapangan->rating;
+    $priceRules = $lapangan->priceRules->sortByDesc('priority')->values();
 @endphp
 
 
@@ -141,8 +104,12 @@
                     {{ $lapangan->jenis }}
                 </span>
 
+                @if($lapangan->area_type)
+                    <span class="u-tag" style="background:#f2f8f4;color:#29523a">{{ $lapangan->area_type }}</span>
+                @endif
+
                 <span class="u-meta">
-                    ★ {{ number_format($lapangan->rating, 1) }}
+                    ★ {{ $avgRating ? number_format((float) $avgRating, 1) : 'Baru' }}
                 </span>
             </div>
 
@@ -185,23 +152,54 @@
 
 <p class="u-meta">
     <i class="fa-solid fa-location-dot"></i>
-    {{ $lapangan->lokasi }}
+    {{ $lapangan->display_location }}
 </p>
 
             <p>
                 {{ $lapangan->deskripsi ?: __('Belum ada deskripsi untuk lapangan ini.') }}
             </p>
 
-            @if($lapangan->fasilitas)
-                <p><strong>{{ __('Fasilitas') }}</strong></p>
+            @if($lapangan->court_facilities_list)
+                <p><strong>{{ __('Fasilitas lapangan') }}</strong></p>
+                <p>{{ implode(', ', $lapangan->court_facilities_list) }}</p>
+            @endif
 
-                <p>
-                    {{ implode(', ', (array) $lapangan->fasilitas) }}
-                </p>
+            @if($lapangan->floor_type)
+                <p class="u-meta"><i class="fa-solid fa-layer-group"></i> {{ __('Jenis lantai') }}: {{ $lapangan->floor_type }}</p>
+            @endif
+
+            <p class="u-meta">
+                <i class="fa-solid fa-store"></i>
+                {{ __('Status operasional') }}:
+                <strong style="color:{{ $lapangan->is_bookable ? '#087747' : '#94600b' }}">{{ $lapangan->operational_status ?: 'Beroperasi' }}</strong>
+            </p>
+
+            @if($lapangan->is_under_maintenance && $lapangan->maintenance_note)
+                <p class="u-meta" style="color:#94600b"><i class="fa-solid fa-triangle-exclamation"></i> {{ $lapangan->maintenance_note }}</p>
+            @endif
+
+            @if($priceRules->count())
+                <div style="margin-top:12px;padding:12px;border:1px solid #e2eee6;border-radius:12px;background:#f7fbf8">
+                    <strong style="display:block;font-size:13px;color:#164b31;margin-bottom:8px"><i class="fa-solid fa-clock"></i> {{ __('Aturan harga') }}</strong>
+                    <div style="display:flex;flex-direction:column;gap:6px">
+                        @foreach($priceRules as $rule)
+                            <div style="display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#4a6055">
+                                <span>
+                                    {{ $rule->label ?: ucfirst($rule->day_type) }}
+                                    · {{ substr((string) $rule->start_time, 0, 5) }}–{{ substr((string) $rule->end_time, 0, 5) }}
+                                    @if($rule->day_type === 'custom' && $rule->days)
+                                        · {{ implode(', ', $rule->days) }}
+                                    @endif
+                                </span>
+                                <strong>Rp {{ number_format((int) $rule->price, 0, ',', '.') }}</strong>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
             @endif
 
             <div class="u-price">
-                Rp {{ number_format($lapangan->harga, 0, ',', '.') }}
+                Rp {{ number_format($lapangan->min_price, 0, ',', '.') }}
                 <span class="u-meta">/ jam</span>
             </div>
 
@@ -222,6 +220,13 @@
             <p class="u-meta">
                 {{ __('Pilih tanggal, waktu mulai, durasi, dan metode pembayaran. Jadwal akan diperiksa sebelum booking dibuat.') }}
             </p>
+
+            @if(!$lapangan->is_bookable)
+                <div style="padding:12px;border-radius:10px;background:#fff8e9;border:1px solid #f4e0b8;color:#855b16;font-size:13px;margin-bottom:12px">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    {{ __('Lapangan ini sedang') }} {{ strtolower($lapangan->operational_status ?: 'tidak aktif') }} {{ __('dan belum dapat dipesan.') }}
+                </div>
+            @endif
 
             <form
                 method="POST"
@@ -324,7 +329,8 @@
                 <button
                     type="submit"
                     class="u-btn"
-                    style="grid-column:1/-1">
+                    style="grid-column:1/-1"
+                    @disabled(!$lapangan->is_bookable)>
                     {{ __('Booking & Bayar Sekarang') }}
                 </button>
 
@@ -341,7 +347,7 @@
 {{-- ========================================= --}}
 @php
     $reviews = $lapangan->reviews ?? collect();
-    $avgRating = $reviews->count() > 0 ? round($reviews->avg('rating'), 1) : round($lapangan->rating ?? 5.0, 1);
+    $avgRating = $reviews->count() > 0 ? round($reviews->avg('rating'), 1) : round((float) ($lapangan->reviews_avg_rating ?? $lapangan->rating ?? 0), 1);
 @endphp
 
 <div class="u-card" style="margin-top:28px; padding:24px 28px;">

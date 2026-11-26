@@ -52,14 +52,15 @@
         </div>
         <div class="form-group">
             <label>Gambar Reward</label>
-            <input class="input-ui" type="file" accept="image/*" name="image" data-preview="reward-create-preview">
+            <input class="input-ui" type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" name="image" data-preview="reward-create-preview">
+            <small class="muted">Format: JPG, PNG, WEBP, atau SVG (Maks. 5 MB).</small>
         </div>
     </div>
     <div class="form-group">
         <label>Deskripsi</label>
         <textarea class="textarea-ui" name="description" placeholder="Jelaskan manfaat reward, syarat penggunaan, atau cara penukaran.">{{ old('description') }}</textarea>
     </div>
-    <div class="form-group preview-shell"><label>Preview Gambar</label><img id="reward-create-preview" class="preview-img" style="display:none" alt="Preview Reward"></div>
+    <div class="form-group preview-shell"><label>Preview Gambar</label><img id="reward-create-preview" class="preview-img" style="display:none; max-height:180px; object-fit:contain;" alt="Preview Reward"></div>
     <div style="display:flex; justify-content:flex-end;"><button class="btn-ui btn-green" type="submit">Tambah Reward</button></div>
 </form>
 
@@ -67,7 +68,7 @@
     @forelse($rewards as $reward)
         @php $manageable = $canManageReward($reward); @endphp
         <div class="reward-card">
-            @if($reward->image)
+            @if($reward->image && file_exists(public_path($reward->image)))
                 <img class="reward-photo" src="{{ asset($reward->image) }}" alt="{{ $reward->title }}">
             @else
                 <div class="reward-banner">{{ $reward->badge ?: 'Reward' }}</div>

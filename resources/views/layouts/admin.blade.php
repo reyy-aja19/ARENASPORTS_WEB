@@ -101,6 +101,11 @@
                     <span class="menu-icon"><i class="fa-solid fa-building-circle-check"></i></span>
                     <span class="label">Manajemen Venue</span>
                 </a>
+                <a class="sidebar-link {{ request()->routeIs('admin.venue-profile*') ? 'active' : '' }}"
+                   href="{{ route('admin.venue-profile') }}">
+                    <span class="menu-icon"><i class="fa-solid fa-store"></i></span>
+                    <span class="label">Profil Venue</span>
+                </a>
             @endif
             @if($isAdmin)
     <a class="sidebar-link {{ request()->routeIs('admin.bookings*') ? 'active' : '' }}"
@@ -382,6 +387,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 const objectUrl = URL.createObjectURL(this.files[0]);
                 preview.src = objectUrl;
                 preview.dataset.objectUrl = objectUrl;
+                preview.style.display = 'block';
+                const placeholder = document.getElementById(previewId + '-placeholder') || document.getElementById('reward-preview-placeholder');
+                if (placeholder) {
+                    placeholder.style.display = 'none';
+                }
                 preview.closest('.preview-shell')?.classList.add('has-image');
             }
         });

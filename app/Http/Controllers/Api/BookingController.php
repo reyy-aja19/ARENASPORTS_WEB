@@ -87,8 +87,7 @@ class BookingController extends BaseApiController
         $lapangan = Lapangan::with('venue')->findOrFail($data['lapangan_id']);
 
         abort_unless(
-            $lapangan->status === 'Tersedia'
-                && (! $lapangan->venue_id || $lapangan->venue?->status === 'Aktif'),
+            $lapangan->is_bookable,
             422,
             'Lapangan tidak tersedia atau venue belum aktif.'
         );
@@ -110,6 +109,20 @@ class BookingController extends BaseApiController
             ]);
         }
 
+        $pricing = app(\App\Services\CourtPricingService::class);
+
+        if (!$pricing->isOperatingDay($lapangan->venue, $data['booking_date'])) {
+            throw ValidationException::withMessages([
+                'booking_date' => 'Venue tidak beroperasi pada hari tersebut.',
+            ]);
+        }
+
+        if (!$pricing->withinOperatingHours($lapangan->venue, $data['start_time'], (int) $data['hours'])) {
+            throw ValidationException::withMessages([
+                'start_time' => 'Jam booking di luar jam operasional venue.',
+            ]);
+        }
+
         if ($this->hasOverlap($lapangan->id, $data['booking_date'], $data['start_time'], $endTime)) {
             throw ValidationException::withMessages([
                 'start_time' => 'Jadwal tersebut sudah dipesan atau sedang menunggu pembayaran.',
@@ -125,7 +138,8 @@ class BookingController extends BaseApiController
                 ]);
             }
 
-            $totalPrice = (int) $lapangan->harga * (int) $data['hours'];
+            $totalPrice = app(\App\Services\CourtPricingService::class)
+                ->quote($lapangan, $data['booking_date'], $data['start_time'], (int) $data['hours'])['total'];
 
             $booking = Booking::create([
                 'user_id' => $user->id,
@@ -306,7 +320,8 @@ class BookingController extends BaseApiController
                 ]);
             }
 
-            $amount = (int) $lapangan->harga * (int) $data['hours'];
+            $amount = app(\App\Services\CourtPricingService::class)
+                ->quote($lapangan, $bookingDate, $previousEnd, (int) $data['hours'])['total'];
 
             $extension = BookingExtension::create([
                 'booking_id' => $locked->id,

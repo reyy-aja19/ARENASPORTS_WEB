@@ -108,7 +108,7 @@ class GeminiChatbotService
     private function buildContext(?float $lat, ?float $lng): string
     {
         $lines = [];
-        $courts = Lapangan::with('venue')->where('status', 'Tersedia')->orderBy('harga')->take(8)->get();
+        $courts = Lapangan::with(['venue', 'priceRules'])->bookable()->orderBy('harga')->take(8)->get();
         if ($courts->isNotEmpty()) {
             $lines[] = 'Lapangan tersedia:';
             foreach ($courts as $c) {

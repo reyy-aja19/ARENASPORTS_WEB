@@ -96,14 +96,15 @@ class UserController extends Controller
             ->take(3)
             ->get();
 
-        $courts = Lapangan::where('status', 'Tersedia')
+        $courts = Lapangan::bookable()
+            ->with(['venue', 'priceRules'])
             ->latest()
             ->get();
 
         $venueCount = Venue::where('status', 'Aktif')->count();
 
         $venues = Venue::withCount([
-            'lapangans' => fn ($q) => $q->where('status', 'Tersedia')
+            'lapangans' => fn ($q) => $q->operational()
         ])
             ->where('status', 'Aktif')
             ->latest()
@@ -137,123 +138,178 @@ class UserController extends Controller
     }
 
    
-public function courts(Request $request): View
-{
-    $user = $this->optionalUser($request);
+    public function courts(Request $request): View
+    {
+        $user = $this->optionalUser($request);
 
-    // Ambil lapangan beserta data venue.
-    $query = Lapangan::with('venue')
-        ->where('status', 'Tersedia')
-        ->where(function ($venueQuery) {
-            $venueQuery->whereNull('venue_id')
-                ->orWhereHas('venue', function ($venue) {
-                    $venue->where('status', 'Aktif');
-                });
-        });
+        if ($request->has('clear_location')) {
+            $request->session()->forget(['user_lat', 'user_lng']);
 
-    // Pencarian berdasarkan nama, lokasi, atau jenis olahraga.
-    if ($request->filled('q')) {
-        $query->where(function ($q) use ($request) {
-            $q->where('nama', 'like', '%' . $request->q . '%')
-                ->orWhere('lokasi', 'like', '%' . $request->q . '%')
-                ->orWhere('jenis', 'like', '%' . $request->q . '%');
-        });
-    }
+            return redirect()->route('user.courts', $request->except(['clear_location', 'lat', 'lng']));
+        }
 
-    // Filter berdasarkan jenis olahraga.
-    if ($request->filled('jenis')) {
-        $query->where('jenis', $request->jenis);
-    }
+        if ($request->filled('lat') && $request->filled('lng')) {
+            $request->session()->put('user_lat', (float) $request->lat);
+            $request->session()->put('user_lng', (float) $request->lng);
 
-    $courts = $query->latest()->get();
+            return redirect()->route('user.courts', $request->except(['lat', 'lng']));
+        }
 
-    // Periksa koordinat lokasi pengguna.
-    if (
-        $request->filled('lat') &&
-        $request->filled('lng') &&
-        is_numeric($request->lat) &&
-        is_numeric($request->lng)
-    ) {
-        $lat = (float) $request->lat;
-        $lng = (float) $request->lng;
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:120'],
+            'jenis' => ['nullable', 'in:Futsal,Badminton'],
+            'min_price' => ['nullable', 'numeric', 'min:0'],
+            'max_price' => ['nullable', 'numeric', 'min:0'],
+            'date' => ['nullable', 'date'],
+            'start_time' => ['nullable', 'date_format:H:i'],
+            'duration' => ['nullable', 'integer', 'min:1', 'max:8'],
+            'sort' => ['nullable', 'in:nearest,price_asc,price_desc,rating,popular,newest'],
+        ]);
 
-        // Pastikan koordinat pengguna valid.
-        if ($lat >= -90 && $lat <= 90 && $lng >= -180 && $lng <= 180) {
+        $date = $filters['date'] ?? null;
+        $startTime = $filters['start_time'] ?? null;
+        $duration = (int) ($filters['duration'] ?? 1);
+        $sort = $filters['sort'] ?? ($date && $startTime ? 'nearest' : 'newest');
 
-            $courts = $courts->map(function ($court) use ($lat, $lng) {
+        $query = Lapangan::with(['venue', 'priceRules'])
+            ->withCount(['bookings' => function ($booking) {
+                $booking->whereIn('status', ['Lunas', 'Selesai']);
+            }])
+            ->withAvg(['reviews' => function ($review) {
+                $review->where('is_visible', true);
+            }], 'rating')
+            ->bookable();
 
-                $court->distance_km = null;
+        if ($date && $startTime) {
+            $endTime = Carbon::parse($startTime)->addHours($duration)->format('H:i');
 
-                // Prioritas koordinat dari venue.
-                $latitude = $court->venue?->latitude;
-                $longitude = $court->venue?->longitude;
+            $query->with(['bookings' => function ($booking) use ($date) {
+                $booking->whereDate('booking_date', $date)
+                    ->whereIn('status', ['Menunggu', 'DP', 'Lunas'])
+                    ->select('id', 'lapangan_id', 'booking_date', 'start_time', 'end_time');
+            }]);
+        }
 
-                // Jika koordinat venue tidak lengkap,
-                // gunakan koordinat lapangan.
-                if (
-                    !is_numeric($latitude) ||
-                    !is_numeric($longitude)
-                ) {
-                    $latitude = $court->latitude;
-                    $longitude = $court->longitude;
+        if (!empty($filters['q'])) {
+            $term = trim($filters['q']);
+            $query->where(function ($sub) use ($term) {
+                $sub->where('nama', 'like', "%{$term}%")
+                    ->orWhere('lokasi', 'like', "%{$term}%")
+                    ->orWhere('jenis', 'like', "%{$term}%")
+                    ->orWhereHas('venue', function ($venue) use ($term) {
+                        $venue->where('name', 'like', "%{$term}%")
+                            ->orWhere('address', 'like', "%{$term}%")
+                            ->orWhere('city', 'like', "%{$term}%");
+                    });
+            });
+        }
+
+        if (!empty($filters['jenis'])) {
+            $query->where('jenis', $filters['jenis']);
+        }
+
+        $courts = $query->latest()->get();
+
+        $pricing = app(\App\Services\CourtPricingService::class);
+        $userLat = $request->session()->get('user_lat');
+        $userLng = $request->session()->get('user_lng');
+
+        $courts = $courts->filter(function (Lapangan $court) use (
+            $pricing,
+            $date,
+            $startTime,
+            $duration
+        ) {
+            if ($date && !$pricing->isOperatingDay($court->venue, $date)) {
+                return false;
+            }
+
+            if ($date && $startTime) {
+                if (!$pricing->withinOperatingHours($court->venue, $startTime, $duration)) {
+                    return false;
                 }
 
-                // Hitung jarak jika koordinat tersedia.
-                if (
-                    is_numeric($latitude) &&
-                    is_numeric($longitude)
-                ) {
-                    $latitude = (float) $latitude;
-                    $longitude = (float) $longitude;
+                $endTime = Carbon::parse($startTime)->addHours($duration)->format('H:i');
 
-                    // Pastikan koordinat tujuan valid.
-                    if (
-                        $latitude >= -90 &&
-                        $latitude <= 90 &&
-                        $longitude >= -180 &&
-                        $longitude <= 180
-                    ) {
-                        $dLat = deg2rad($latitude - $lat);
-                        $dLng = deg2rad($longitude - $lng);
-
-                        // Rumus Haversine.
-                        $a = sin($dLat / 2) ** 2
-                            + cos(deg2rad($lat))
-                            * cos(deg2rad($latitude))
-                            * sin($dLng / 2) ** 2;
-
-                        $court->distance_km = 6371 * 2 * atan2(
-                            sqrt($a),
-                            sqrt(max(0, 1 - $a))
-                        );
+                foreach (($court->bookings ?? collect()) as $booking) {
+                    if ($booking->start_time < $endTime && $booking->end_time > $startTime) {
+                        return false;
                     }
                 }
+            }
 
-                return $court;
+            return true;
+        })->map(function (Lapangan $court) use ($pricing, $date, $startTime, $duration) {
+            $court->effective_price = ($date && $startTime)
+                ? $pricing->quote($court, $date, $startTime, $duration)['total']
+                : $pricing->minimumPrice($court);
 
-            })->sortBy(
-                fn ($court) => $court->distance_km ?? INF
-            )->values();
+            return $court;
+        });
+
+        if (!empty($filters['min_price'])) {
+            $courts = $courts->filter(fn ($court) => $court->effective_price >= (int) $filters['min_price']);
         }
+
+        if (!empty($filters['max_price'])) {
+            $courts = $courts->filter(fn ($court) => $court->effective_price <= (int) $filters['max_price']);
+        }
+
+        $hasLocation = is_numeric($userLat) && is_numeric($userLng);
+
+        $courts = $courts->map(function (Lapangan $court) use ($userLat, $userLng, $hasLocation) {
+            $court->distance_km = null;
+
+            if (!$hasLocation) {
+                return $court;
+            }
+
+            $latitude = $court->effective_latitude;
+            $longitude = $court->effective_longitude;
+
+            if (!is_numeric($latitude) || !is_numeric($longitude)) {
+                return $court;
+            }
+
+            $dLat = deg2rad((float) $latitude - (float) $userLat);
+            $dLng = deg2rad((float) $longitude - (float) $userLng);
+
+            $a = sin($dLat / 2) ** 2
+                + cos(deg2rad((float) $userLat))
+                * cos(deg2rad((float) $latitude))
+                * sin($dLng / 2) ** 2;
+
+            $court->distance_km = 6371 * 2 * atan2(sqrt($a), sqrt(max(0, 1 - $a)));
+
+            return $court;
+        });
+
+        $courts = match ($sort) {
+            'nearest' => $courts->sortBy(fn ($court) => $court->distance_km ?? INF),
+            'price_asc' => $courts->sortBy('effective_price'),
+            'price_desc' => $courts->sortByDesc('effective_price'),
+            'rating' => $courts->sortByDesc(fn ($court) => (float) ($court->reviews_avg_rating ?? 0)),
+            'popular' => $courts->sortByDesc('bookings_count'),
+            default => $courts->sortByDesc('created_at'),
+        };
+
+        $courts = $courts->values();
+
+        return view('user.courts', compact('user', 'courts', 'filters', 'sort', 'date', 'startTime', 'duration'));
     }
 
-    return view('user.courts', compact('user', 'courts'));
-}
-
-
-    public function courtDetail(
+public function courtDetail(
         Request $request,
         Lapangan $lapangan
     ): View {
         $user = $this->optionalUser($request);
 
-        $lapangan->loadMissing(['venue', 'reviews' => function ($q) {
+        $lapangan->loadMissing(['venue', 'priceRules', 'reviews' => function ($q) {
             $q->where('is_visible', true)->with('user')->latest();
         }]);
 
         abort_unless(
-            $lapangan->status === 'Tersedia' &&
-            (!$lapangan->venue_id || $lapangan->venue?->status === 'Aktif'),
+            !$lapangan->venue_id || $lapangan->venue?->status === 'Aktif',
             404
         );
 
@@ -274,8 +330,7 @@ public function courts(Request $request): View
         $lapangan->loadMissing('venue');
 
         abort_unless(
-            $lapangan->status === 'Tersedia' &&
-            (!$lapangan->venue_id || $lapangan->venue?->status === 'Aktif'),
+            $lapangan->is_bookable,
             422,
             'Lapangan tidak tersedia atau venue belum aktif.'
         );
@@ -303,6 +358,20 @@ public function courts(Request $request): View
         if ($endTime <= $data['start_time']) {
             return back()->withErrors([
                 'hours' => 'Jam selesai melewati tengah malam. Pilih durasi yang lebih pendek.',
+            ])->withInput();
+        }
+
+        $pricing = app(\App\Services\CourtPricingService::class);
+
+        if (!$pricing->isOperatingDay($lapangan->venue, $data['booking_date'])) {
+            return back()->withErrors([
+                'booking_date' => 'Venue tidak beroperasi pada hari tersebut.',
+            ])->withInput();
+        }
+
+        if (!$pricing->withinOperatingHours($lapangan->venue, $data['start_time'], (int) $data['hours'])) {
+            return back()->withErrors([
+                'start_time' => 'Jam booking di luar jam operasional venue.',
             ])->withInput();
         }
 
@@ -356,7 +425,8 @@ public function courts(Request $request): View
                 ]);
             }
 
-            $totalPrice = (int) $lapangan->harga * (int) $data['hours'];
+            $totalPrice = app(\App\Services\CourtPricingService::class)
+                ->quote($lapangan, $data['booking_date'], $data['start_time'], (int) $data['hours'])['total'];
             $method = $data['payment_method'];
 
             $booking = Booking::create([
@@ -661,6 +731,20 @@ public function courts(Request $request): View
             }
 
             $bookingDate = $lockedBooking->booking_date->toDateString();
+            $lapangan->loadMissing('venue');
+            $pricing = app(\App\Services\CourtPricingService::class);
+
+            if (!$pricing->isOperatingDay($lapangan->venue, $bookingDate)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'hours' => 'Venue tidak beroperasi pada tanggal booking tersebut.',
+                ]);
+            }
+
+            if (!$pricing->withinOperatingHours($lapangan->venue, $previousEnd, (int) $data['hours'])) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'hours' => 'Perpanjangan melewati jam operasional venue.',
+                ]);
+            }
 
             $bookingOverlap = Booking::where(
                 'lapangan_id',
@@ -705,7 +789,8 @@ public function courts(Request $request): View
                 ]);
             }
 
-            $amount = (int) $lapangan->harga * (int) $data['hours'];
+            $amount = app(\App\Services\CourtPricingService::class)
+                ->quote($lapangan, $bookingDate, $previousEnd, (int) $data['hours'])['total'];
 
             $extension = BookingExtension::create([
                 'booking_id' => $lockedBooking->id,
@@ -1443,7 +1528,6 @@ public function courts(Request $request): View
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
             'phone' => ['nullable', 'string', 'max:50'],
-            'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'profile_photo' => [
                 'nullable',
                 'image',
@@ -1481,10 +1565,6 @@ public function courts(Request $request): View
             $updates['email_verified_at'] = null;
         }
 
-        if (! empty($data['password'])) {
-            $updates['password'] = Hash::make($data['password']);
-        }
-
         if ($request->boolean('remove_photo') && $user->profile_photo) {
             $this->deleteProfilePhoto($user->profile_photo);
             $updates['profile_photo'] = null;
@@ -1504,6 +1584,33 @@ public function courts(Request $request): View
             'success',
             'Profil berhasil diperbarui.'
         );
+    }
+
+    public function passwordUpdate(Request $request): RedirectResponse
+    {
+        $user = $this->currentUser($request);
+
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'current_password.required' => 'Password lama wajib diisi.',
+            'password.required' => 'Password baru wajib diisi.',
+            'password.min' => 'Password baru minimal 8 karakter.',
+            'password.confirmed' => 'Konfirmasi password baru tidak sama.',
+        ]);
+
+        if (! Hash::check($data['current_password'], $user->password)) {
+            return back()->withErrors([
+                'current_password' => 'Password lama tidak sesuai.',
+            ])->withInput();
+        }
+
+        $user->update([
+            'password' => Hash::make($data['password']),
+        ]);
+
+        return back()->with('success', 'Password berhasil diubah.');
     }
 
     private function deleteProfilePhoto(?string $path): void
@@ -1550,6 +1657,15 @@ public function courts(Request $request): View
             ],
             $data
         );
+
+        // Simpan rata-rata rating agar daftar/API lama tetap kompatibel.
+        $averageRating = Review::where('lapangan_id', $booking->lapangan_id)
+            ->where('is_visible', true)
+            ->avg('rating');
+
+        Lapangan::whereKey($booking->lapangan_id)->update([
+            'rating' => round((float) ($averageRating ?? 0), 2),
+        ]);
 
         // Notifikasi ke pemilik venue / superadmin jika ada review baru
         $booking->loadMissing('lapangan.venue');

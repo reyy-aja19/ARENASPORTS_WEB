@@ -51,9 +51,6 @@
     $hasInteriorPhoto = $isRevision &&
         $existingDocuments->contains('document_type', 'Foto Bagian Dalam');
 
-    $hasCourtPhotos = $isRevision &&
-        $existingDocuments->contains('document_type', 'Foto Fasilitas Lapangan');
-
     // Sumber data prefill
     $sourceApp = $isRevision ? $activeApplication : ($isNewVenueBranch ? null : $application);
     $companySource = $isRevision ? $activeApplication : ($latestApplication ?? $application);
@@ -61,6 +58,35 @@
     $selectedOwnership = old(
         'ownership_type',
         $sourceApp->ownership_type ?? ''
+    );
+
+    $selectedEntityType = old(
+        'entity_type',
+        $sourceApp->entity_type ?? $companySource->entity_type ?? ''
+    );
+
+    $selectedBusinessType = old(
+        'business_type',
+        $sourceApp->business_type ?? $companySource->business_type ?? ''
+    );
+
+    $selectedOperatingDays = old(
+        'operating_days',
+        $sourceApp->operating_days ?? ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+    );
+
+    if (!is_array($selectedOperatingDays)) {
+        $selectedOperatingDays = [];
+    }
+
+    $openingTime = old(
+        'opening_time',
+        $sourceApp?->opening_time ? substr((string) $sourceApp->opening_time, 0, 5) : ''
+    );
+
+    $closingTime = old(
+        'closing_time',
+        $sourceApp?->closing_time ? substr((string) $sourceApp->closing_time, 0, 5) : ''
     );
 
     $facilityValues = old('facilities', $sourceApp->facilities ?? [
@@ -490,103 +516,104 @@
                 </div>
             </section>
 
-            {{-- 2. DATA PERUSAHAAN --}}
+                        {{-- 2. DATA USAHA --}}
             <section class="va-card">
-                <h3 class="va-section-title">2. Data Perusahaan atau Badan Usaha</h3>
+                <h3 class="va-section-title">2. Data Usaha</h3>
+
+                <p class="va-muted" style="font-size:13px;margin-top:-6px">
+                    Data perusahaan bersifat opsional untuk venue perorangan. Pilih jenis usaha terlebih dahulu.
+                </p>
 
                 <div class="va-grid">
 
                     <div class="va-field">
-                        <label>Alamat pemilik usaha</label>
-                        <textarea name="owner_address" rows="2" required>{{ old('owner_address', $application->owner_address ?? '') }}</textarea>
-                    </div>
-
-                    <div class="va-field">
-                        <label>Nomor identitas (opsional)</label>
-                        <input
-                            name="identity_number"
-                            value="{{ old('identity_number', $application->identity_number ?? '') }}"
-                            maxlength="80"
-                        >
-                    </div>
-
-                    <div class="va-field">
-                        <label>Nama perusahaan / usaha</label>
-                        <input
-                            name="company_name"
-                            value="{{ old('company_name', $application->company_name ?? '') }}"
-                            maxlength="180"
-                            required
-                        >
-                    </div>
-
-                    <div class="va-field">
-                        <label>Jenis badan usaha</label>
-                        <select name="business_type" required>
+                        <label>
+                            Jenis usaha <span class="va-required-note">*</span>
+                        </label>
+                        <select name="entity_type" id="entity-type" required>
                             <option value="">Pilih jenis usaha</option>
+                            <option value="Perorangan" @selected($selectedEntityType === 'Perorangan')>Perorangan</option>
+                            <option value="Badan Usaha" @selected($selectedEntityType === 'Badan Usaha')>Badan Usaha</option>
+                        </select>
+                        <small>Pilih Perorangan jika venue tidak dimiliki perusahaan berbadan hukum.</small>
+                    </div>
 
-                            @foreach(['Perorangan','CV','PT','Koperasi','Yayasan','Lainnya'] as $type)
-                                <option
-                                    value="{{ $type }}"
-                                    @selected(old('business_type', $application->business_type ?? '') === $type)
-                                >
-                                    {{ $type }}
-                                </option>
+                    <div class="va-field js-company-field">
+                        <label>Jenis badan usaha</label>
+                        <select name="business_type" id="business-type">
+                            <option value="">Pilih jenis badan usaha</option>
+                            @foreach(['CV','PT','Koperasi','Yayasan','Lainnya'] as $type)
+                                <option value="{{ $type }}" @selected($selectedBusinessType === $type)>{{ $type }}</option>
                             @endforeach
                         </select>
+                        <small>Wajib untuk badan usaha.</small>
                     </div>
 
-                    <div class="va-field">
-                        <label>Nomor NIB (jika tersedia)</label>
+                    <div class="va-field js-company-field">
+                        <label>Nama perusahaan / badan usaha</label>
                         <input
-                            name="nib"
-                            value="{{ old('nib', $application->nib ?? '') }}"
-                            maxlength="80"
+                            name="company_name"
+                            value="{{ old('company_name', $sourceApp->company_name ?? $companySource->company_name ?? '') }}"
+                            maxlength="180"
+                            placeholder="Contoh: PT Arena Sports Indonesia"
                         >
                     </div>
 
-                    <div class="va-field">
-                        <label>Nomor telepon perusahaan</label>
+                    <div class="va-field js-company-field">
+                        <label>Nomor NIB / izin usaha (opsional)</label>
+                        <input
+                            name="nib"
+                            value="{{ old('nib', $sourceApp->nib ?? $companySource->nib ?? '') }}"
+                            maxlength="100"
+                            placeholder="Isi jika tersedia"
+                        >
+                    </div>
+
+                    <div class="va-field js-company-field">
+                        <label>Telepon perusahaan</label>
                         <input
                             name="company_phone"
-                            value="{{ old('company_phone', $application->company_phone ?? '') }}"
+                            value="{{ old('company_phone', $sourceApp->company_phone ?? $companySource->company_phone ?? '') }}"
                             maxlength="30"
-                            required
                         >
                     </div>
 
                     <div class="va-field">
                         <label>Kota</label>
-                        <input
-                            name="city"
-                            value="{{ old('city', $application->city ?? '') }}"
-                            required
-                        >
+                        <input name="city" value="{{ old('city', $sourceApp->city ?? '') }}" required maxlength="100">
                     </div>
 
                     <div class="va-field">
                         <label>Provinsi</label>
-                        <input
-                            name="province"
-                            value="{{ old('province', $application->province ?? '') }}"
-                            required
-                        >
+                        <input name="province" value="{{ old('province', $sourceApp->province ?? '') }}" required maxlength="100">
                     </div>
 
                     <div class="va-field full">
+                        <label>Alamat pemilik usaha <span class="va-required-note">*</span></label>
+                        <textarea name="owner_address" rows="2" required>{{ old('owner_address', $sourceApp->owner_address ?? '') }}</textarea>
+                        <small>Alamat ini terpisah dari alamat venue.</small>
+                    </div>
+
+                    <div class="va-field">
+                        <label>Nomor identitas pemilik (NIK, opsional)</label>
+                        <input name="identity_number" value="{{ old('identity_number', $sourceApp->identity_number ?? '') }}" maxlength="80">
+                    </div>
+
+                    <div class="va-field full js-company-field">
                         <label>Alamat perusahaan</label>
-                        <textarea name="company_address" rows="2" required>{{ old('company_address', $application->company_address ?? '') }}</textarea>
+                        <textarea name="company_address" rows="2">{{ old('company_address', $sourceApp->company_address ?? $companySource->company_address ?? '') }}</textarea>
+                        <small>Alamat kantor/usaha. Berbeda dengan alamat venue.</small>
                     </div>
 
-                    <div class="va-field full">
-                        <label>Deskripsi perusahaan</label>
-                        <textarea name="company_description" rows="2">{{ old('company_description', $application->company_description ?? '') }}</textarea>
+                    <div class="va-field full js-company-field">
+                        <label>Deskripsi perusahaan (opsional)</label>
+                        <textarea name="company_description" rows="2">{{ old('company_description', $sourceApp->company_description ?? $companySource->company_description ?? '') }}</textarea>
                     </div>
 
                 </div>
             </section>
 
-            {{-- 3. INFORMASI VENUE --}}
+{{-- 3. INFORMASI VENUE --}}
             <section class="va-card">
                 <h3 class="va-section-title">3. Informasi Venue</h3>
 
@@ -605,16 +632,27 @@
                     </div>
 
                     <div class="va-field">
-                        <label>
-                            Jam operasional <span class="va-required-note">*</span>
-                        </label>
-                        <input
-                            name="operating_hours"
-                            value="{{ old('operating_hours', $application->operating_hours ?? '07.00–23.00 WIB') }}"
-                            placeholder="Contoh: 07.00–23.00 WIB"
-                            maxlength="150"
-                            required
-                        >
+                        <label>Jam buka (opsional)</label>
+                        <input type="time" name="opening_time" value="{{ $openingTime }}">
+                        <small>Kosongkan jika belum ditentukan. Jam dipakai untuk validasi booking.</small>
+                    </div>
+
+                    <div class="va-field">
+                        <label>Jam tutup (opsional)</label>
+                        <input type="time" name="closing_time" value="{{ $closingTime }}">
+                    </div>
+
+                    <div class="va-field full">
+                        <label>Hari operasional</label>
+                        <div class="va-sports">
+                            @foreach(['Senin','Selasa','Rabu','Kamis','Jumat','Sabtu','Minggu'] as $day)
+                                <label>
+                                    <input type="checkbox" name="operating_days[]" value="{{ $day }}" @checked(in_array($day, $selectedOperatingDays, true))>
+                                    {{ $day }}
+                                </label>
+                            @endforeach
+                        </div>
+                        <small>Kosongkan untuk dianggap beroperasi setiap hari.</small>
                     </div>
 
                     <div class="va-field">
@@ -673,16 +711,17 @@
 
                     <div class="va-field full">
                         <label>
-                            Deskripsi venue dan fasilitas
+                            Deskripsi singkat venue
                             <span class="va-required-note">*</span>
                         </label>
                         <textarea
                             name="description"
                             rows="4"
                             maxlength="3000"
-                            placeholder="Jelaskan jumlah lapangan, fasilitas, area parkir, ruang ganti, toilet, dan fasilitas lainnya."
+                            placeholder="Ceritakan keunggulan venue, fasilitas, area parkir, ruang ganti, dan informasi lain yang penting bagi penyewa."
                             required
                         >{{ old('description', $application->description ?? '') }}</textarea>
+                        <small>Jumlah lapangan akan dihitung otomatis setelah lapangan ditambahkan.</small>
                     </div>
 
                     {{-- JENIS OLAHRAGA --}}
@@ -897,31 +936,12 @@
                         </small>
                     </div>
 
-                    <div class="va-field full">
-                        <label>
-                            Foto fasilitas dan lapangan
-                            <span class="va-required-note">*</span>
-                        </label>
-
-                        <input
-                            type="file"
-                            name="court_photos[]"
-                            class="js-scan-input"
-                            accept="image/jpeg,image/png,image/webp"
-                            multiple
-                            @if(!$hasCourtPhotos) required @endif
-                        >
-
-                        <small>
-                            Unggah minimal satu foto dan maksimal delapan foto.
-                            Setiap file maksimal 5 MB.
-                            @if($hasCourtPhotos)
-                                Kosongkan jika foto sebelumnya masih berlaku.
-                            @endif
-                        </small>
-                    </div>
-
                 </div>
+
+                <p class="va-muted" style="font-size:12px;margin:10px 0 0">
+                    <i class="fa-solid fa-circle-info"></i>
+                    Foto fasilitas dan area lapangan dapat ditambahkan oleh pengelola setelah pengajuan disetujui.
+                </p>
             </section>
 
             {{-- 6. PERNYATAAN TANGGUNG JAWAB --}}
@@ -1041,6 +1061,44 @@ document.addEventListener('DOMContentLoaded', function () {
     if (type) {
         type.addEventListener('change', updateOwnershipFields);
         updateOwnershipFields();
+    }
+
+
+    /* ==================================
+       JENIS USAHA (PERORANGAN / BADAN USAHA)
+    ================================== */
+
+    const entityType = document.getElementById('entity-type');
+    const companyFields = document.querySelectorAll('.js-company-field');
+
+    function updateEntityFields() {
+        if (!entityType) return;
+
+        const isCompany = entityType.value === 'Badan Usaha';
+        const isPerorangan = entityType.value === 'Perorangan';
+
+        companyFields.forEach(function (field) {
+            field.style.display = isCompany ? '' : 'none';
+
+            field.querySelectorAll('input, textarea, select').forEach(function (input) {
+                input.disabled = !isCompany;
+            });
+        });
+
+        if (isPerorangan) {
+            const companyName = document.querySelector('input[name="company_name"]');
+            const companyPhone = document.querySelector('input[name="company_phone"]');
+            const companyAddress = document.querySelector('textarea[name="company_address"]');
+
+            [companyName, companyPhone, companyAddress].forEach(function (input) {
+                if (input) input.value = '';
+            });
+        }
+    }
+
+    if (entityType) {
+        entityType.addEventListener('change', updateEntityFields);
+        updateEntityFields();
     }
 
 

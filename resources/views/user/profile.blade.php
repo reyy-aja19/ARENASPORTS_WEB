@@ -135,16 +135,6 @@
                 <small class="pf-help">Nomor ini digunakan untuk notifikasi WhatsApp jika tersedia.</small>
             </div>
 
-            <div class="pf-section-title">Ganti password (opsional)</div>
-            <div class="pf-field">
-                <label for="password">Password baru</label>
-                <input id="password" type="password" name="password" minlength="8" autocomplete="new-password">
-            </div>
-            <div class="pf-field">
-                <label for="password_confirmation">Konfirmasi password baru</label>
-                <input id="password_confirmation" type="password" name="password_confirmation" minlength="8" autocomplete="new-password">
-            </div>
-
             <div class="pf-actions">
                 <button class="pf-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Simpan perubahan</button>
                 <a class="pf-btn ghost" href="{{ route('user.bookings') }}"><i class="fa-solid fa-receipt"></i> Booking saya</a>
@@ -153,8 +143,8 @@
     </section>
 
     <aside class="pf-card">
-        <h2>Ringkasan Akun</h2>
-        <p class="lead">Informasi singkat aktivitas dan status akun kamu.</p>
+        <h2>Informasi Akun</h2>
+        <p class="lead">Ringkasan data dan status akun kamu.</p>
 
         <div class="pf-info"><span class="lbl">Nama</span><span class="val">{{ $user->name }}</span></div>
         <div class="pf-info"><span class="lbl">Email</span><span class="val">{{ $user->email ?: '-' }}</span></div>
@@ -165,17 +155,62 @@
         <div class="pf-info"><span class="lbl">Reward ditukar</span><span class="val">{{ number_format($stats['redemptions'] ?? 0) }}</span></div>
         <div class="pf-info"><span class="lbl">Member sejak</span><span class="val">{{ optional($stats['member_since'] ?? $user->created_at)->format('d M Y') }}</span></div>
 
-        <div class="pf-note">
-            <i class="fa-solid fa-shield-halved"></i>
-            <div><strong>Keamanan akun</strong><p style="margin:4px 0 0;">Jika email dan nomor WhatsApp sudah ditambahkan, ArenaSports dapat mengirimkan pemberitahuan saat akun digunakan untuk login atau aktivitas penting.</p></div>
-        </div>
-
         <div class="pf-actions">
             <a class="pf-btn ghost" href="{{ route('user.rewards') }}"><i class="fa-solid fa-gift"></i> Lihat reward</a>
             <a class="pf-btn ghost" href="{{ route('user.notifications') }}"><i class="fa-regular fa-bell"></i> Notifikasi</a>
         </div>
     </aside>
 </div>
+
+<section class="pf-card" style="margin-top:22px">
+    <h2><i class="fa-solid fa-shield-halved"></i> Keamanan Akun</h2>
+    <p class="lead">Ubah password secara berkala untuk menjaga keamanan akun kamu.</p>
+
+    <div class="pf-note" style="margin-bottom:16px">
+        <i class="fa-solid fa-lock"></i>
+        <div>
+            <strong>Password</strong>
+            <p style="margin:4px 0 0;">Gunakan minimal 8 karakter dan jangan bagikan password kepada siapa pun.</p>
+        </div>
+    </div>
+
+    <button type="button" class="pf-btn" id="togglePasswordForm">
+        <i class="fa-solid fa-key"></i> Ubah Password
+    </button>
+
+    <div id="passwordFormWrap" style="display:none;margin-top:18px;padding-top:18px;border-top:1px solid #edf2ee;">
+        <form method="POST" action="{{ route('user.profile.password') }}">
+            @csrf
+            @method('PUT')
+
+            <div class="pf-field">
+                <label for="current_password">Password lama</label>
+                <input id="current_password" type="password" name="current_password" autocomplete="current-password" required>
+                @error('current_password')
+                    <small class="pf-help" style="color:#b42318">{{ $message }}</small>
+                @enderror
+            </div>
+
+            <div class="pf-field">
+                <label for="password">Password baru</label>
+                <input id="password" type="password" name="password" minlength="8" autocomplete="new-password" required>
+                @error('password')
+                    <small class="pf-help" style="color:#b42318">{{ $message }}</small>
+                @enderror
+            </div>
+
+            <div class="pf-field">
+                <label for="password_confirmation">Konfirmasi password baru</label>
+                <input id="password_confirmation" type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required>
+            </div>
+
+            <div class="pf-actions">
+                <button class="pf-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Simpan password baru</button>
+                <button class="pf-btn ghost" type="button" id="cancelPasswordForm">Batal</button>
+            </div>
+        </form>
+    </div>
+</section>
 @endsection
 
 @push('scripts')
@@ -225,5 +260,33 @@
         if (placeholder) placeholder.hidden = true;
     });
 })();
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const toggle = document.getElementById('togglePasswordForm');
+    const wrap = document.getElementById('passwordFormWrap');
+    const cancel = document.getElementById('cancelPasswordForm');
+
+    const openForm = function () {
+        if (!wrap) return;
+        wrap.style.display = 'block';
+        if (toggle) toggle.style.display = 'none';
+        const firstInput = wrap.querySelector('input');
+        if (firstInput) firstInput.focus();
+    };
+
+    const closeForm = function () {
+        if (!wrap) return;
+        wrap.style.display = 'none';
+        if (toggle) toggle.style.display = 'inline-flex';
+    };
+
+    if (toggle) toggle.addEventListener('click', openForm);
+    if (cancel) cancel.addEventListener('click', closeForm);
+
+    @if($errors->has('current_password') || $errors->has('password'))
+        openForm();
+    @endif
+});
 </script>
 @endpush

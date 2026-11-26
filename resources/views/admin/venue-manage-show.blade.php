@@ -17,8 +17,8 @@
 
 <div class="stats-grid" style="margin-bottom:20px;">
     <div class="stat-card"><div class="stat-icon"><i class="fa-solid fa-vector-square"></i></div><div class="label">Total Lapangan</div><div class="value">{{ $courts->count() }}</div></div>
-    <div class="stat-card"><div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div><div class="label">Lapangan Aktif</div><div class="value">{{ $courts->where('status', 'Tersedia')->count() }}</div></div>
-    <div class="stat-card"><div class="stat-icon"><i class="fa-solid fa-store"></i></div><div class="label">Status Venue</div><div class="value" style="font-size:18px;">{{ $venue->status ?? '-' }}</div></div>
+    <div class="stat-card"><div class="stat-icon"><i class="fa-solid fa-circle-check"></i></div><div class="label">Lapangan Aktif</div><div class="value">{{ $courts->filter(fn ($court) => $court->is_bookable)->count() }}</div></div>
+    <div class="stat-card"><div class="stat-icon"><i class="fa-solid fa-store"></i></div><div class="label">Status Venue</div><div class="value" style="font-size:18px;">{{ $venue->operational_status ?: ($venue->status ?? '-') }}</div></div>
 </div>
 
 <div class="panel-card" style="padding:22px;">
@@ -45,11 +45,16 @@
                     <tr>
                         <td>
                             <strong>{{ $court->nama }}</strong>
-                            <div style="font-size:12px;color:#718078;">{{ $court->lokasi }}</div>
+                            <div style="font-size:12px;color:#718078;">{{ $court->display_location }}</div>
                         </td>
-                        <td>{{ $court->jenis }}</td>
-                        <td>Rp {{ number_format((float) $court->harga, 0, ',', '.') }}</td>
-                        <td><span class="status-badge {{ $court->status === 'Tersedia' ? 'status-active' : 'status-inactive' }}">{{ $court->status }}</span></td>
+                        <td>
+                            {{ $court->jenis }}
+                            @if($court->area_type)
+                                <div style="font-size:11px;color:#718078;">{{ $court->area_type }}{{ $court->floor_type ? ' · ' . $court->floor_type : '' }}</div>
+                            @endif
+                        </td>
+                        <td>Rp {{ number_format((float) $court->min_price, 0, ',', '.') }}</td>
+                        <td><span class="status-badge {{ $court->is_bookable ? 'status-active' : 'status-inactive' }}">{{ $court->operational_status ?: 'Beroperasi' }}</span></td>
                         <td>
                             <div class="btn-row wrap">
                                 <a class="btn-ui btn-green" href="{{ route('admin.courts.edit', $court) }}" style="padding:6px 12px;font-size:12px;">

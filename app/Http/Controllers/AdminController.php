@@ -519,124 +519,276 @@ class AdminController extends Controller
 
     public function courtCreate(Request $request): View
     {
-        return view('lapangan.create', $this->layoutData($request, ['venueAdmins' => User::whereIn('role', ['admin','venue_admin'])->where('status', 'Aktif')->orderBy('name')->get(), 'venues' => Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->orderBy('name')->get()]));
+        $venues = $this->isSuperadmin($request)
+            ? Venue::with('owner')->orderBy('name')->get()
+            : Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->orderBy('name')->get();
+
+        return view('lapangan.create', $this->layoutData($request, [
+            'venueAdmins' => User::whereIn('role', ['admin', 'venue_admin'])->where('status', 'Aktif')->orderBy('name')->get(),
+            'venues' => $venues,
+            'isSuperadmin' => $this->isSuperadmin($request),
+        ]));
     }
 
     public function courtStore(Request $request): RedirectResponse
     {
-        $data = $request->validate([
-            'nama' => ['required', 'string', 'max:255'],
-            'jenis' => ['required', 'string', 'max:100'],
-            'lokasi' => ['required', 'string', 'max:255'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'harga' => ['required', 'numeric', 'min:0'],
-            'rating' => ['nullable', 'numeric', 'between:0,5'],
-            'status' => ['required', 'in:Tersedia,Perawatan,Perbaikan,Penuh'],
-            'maintenance_note' => ['nullable', 'string', 'max:1000'],
-            'deskripsi' => ['nullable', 'string'],
-            'foto' => ['nullable', 'image', 'max:4096'],
-            'foto_gallery' => ['nullable', 'array'],
-            'foto_gallery.*' => ['image', 'max:4096'],
-            'fasilitas' => ['nullable', 'array'],
-            'fasilitas.*' => ['nullable', 'string', 'max:80'],
-            'owner_admin_id' => ['nullable', 'exists:users,id'],
-            'venue_id' => ['nullable', 'integer'],
-        ]);
+        $data = $this->validateCourtPayload($request);
+        $venue = $this->resolveCourtVenue($request, $request->integer('venue_id') ?: null);
+
+        if ($this->isSuperadmin($request) && !$venue) {
+            return back()->withInput()->withErrors(['venue_id' => 'Pilih venue untuk lapangan ini.']);
+        }
+
+        $data = $this->applyCourtRelations($request, $data, $venue);
 
         if ($request->hasFile('foto')) {
             $data['foto'] = $this->publicUpload($request, 'foto', 'courts');
         }
 
         $data['foto_gallery'] = $this->publicUploadMultiple($request, 'foto_gallery', 'courts');
-        $data['fasilitas'] = $this->normalizeFacilities($request->input('fasilitas', []));
+        $data['court_facilities'] = $this->normalizeFacilities($request->input('court_facilities', []));
+        $data['rating'] = 0;
+        $data['status'] = $data['operational_status'] === 'Beroperasi'
+            ? 'Tersedia'
+            : $data['operational_status'];
 
-        $data['rating'] = $data['rating'] ?? 4.5;
-        if (!in_array($data['status'], ['Perawatan', 'Perbaikan'], true)) {
-            $data['maintenance_note'] = null;
+        foreach ([
+            'price_labels', 'price_day_types', 'price_days',
+            'price_start_times', 'price_end_times', 'price_prices',
+            'remove_gallery', 'cover_photo',
+        ] as $key) {
+            unset($data[$key]);
         }
-        if (! $this->isSuperadmin($request)) {
-            $data['owner_admin_id'] = $request->session()->get('admin_user_id');
-            if ($request->session()->get('admin_role') === 'venue_admin') {
-                $venue = Venue::where('owner_admin_id', $data['owner_admin_id'])->findOrFail($data['venue_id'] ?? null);
-                $data['venue_id'] = $venue->id;
-            } else {
-                // Admin biasa (bukan venue_admin): tidak perlu venue_id
-                $data['venue_id'] = null;
-            }
-        } else {
-            $ownerId = $request->input('owner_admin_id');
-            if ($ownerId && ! User::where('id', $ownerId)->whereIn('role', ['admin','venue_admin'])->exists()) {
-                return back()->withInput()->withErrors(['owner_admin_id' => 'Pemilik venue harus akun admin venue aktif.']);
-            }
-            $data['owner_admin_id'] = $ownerId;
-            $data['venue_id'] = $ownerId ? Venue::where('owner_admin_id', $ownerId)->value('id') : null;
-        }
-        Lapangan::create($data);
+
+        $court = Lapangan::create($data);
+        $this->syncCourtPriceRules($court, $request);
+
         return redirect()->route('admin.courts')->with('success', 'Lapangan berhasil ditambahkan.');
     }
 
     public function courtEdit(Request $request, Lapangan $lapangan): View
     {
         $this->ensureCourtAccess($request, $lapangan);
-        return view('lapangan.edit', $this->layoutData($request, ['court' => $lapangan, 'venueAdmins' => User::whereIn('role', ['admin','venue_admin'])->where('status', 'Aktif')->orderBy('name')->get(), 'venues' => Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->orderBy('name')->get()]));
+
+        $venues = $this->isSuperadmin($request)
+            ? Venue::with('owner')->orderBy('name')->get()
+            : Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->orderBy('name')->get();
+
+        $lapangan->load(['priceRules', 'venue']);
+
+        return view('lapangan.edit', $this->layoutData($request, [
+            'court' => $lapangan,
+            'venueAdmins' => User::whereIn('role', ['admin', 'venue_admin'])->where('status', 'Aktif')->orderBy('name')->get(),
+            'venues' => $venues,
+            'isSuperadmin' => $this->isSuperadmin($request),
+        ]));
     }
 
     public function courtUpdate(Request $request, Lapangan $lapangan): RedirectResponse
     {
         $this->ensureCourtAccess($request, $lapangan);
-        $data = $request->validate([
-            'nama' => ['required', 'string', 'max:255'],
-            'jenis' => ['required', 'string', 'max:100'],
-            'lokasi' => ['required', 'string', 'max:255'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'harga' => ['required', 'numeric', 'min:0'],
-            'rating' => ['nullable', 'numeric', 'between:0,5'],
-            'status' => ['required', 'in:Tersedia,Perawatan,Perbaikan,Penuh'],
-            'maintenance_note' => ['nullable', 'string', 'max:1000'],
-            'deskripsi' => ['nullable', 'string'],
-            'foto' => ['nullable', 'image', 'max:4096'],
-            'foto_gallery' => ['nullable', 'array'],
-            'foto_gallery.*' => ['image', 'max:4096'],
-            'fasilitas' => ['nullable', 'array'],
-            'fasilitas.*' => ['nullable', 'string', 'max:80'],
-            'owner_admin_id' => ['nullable', 'exists:users,id'],
-            'venue_id' => ['nullable', 'integer'],
-        ]);
+
+        $data = $this->validateCourtPayload($request);
+        $venue = $this->resolveCourtVenue($request, $request->integer('venue_id') ?: $lapangan->venue_id);
+
+        if ($this->isSuperadmin($request) && !$venue) {
+            return back()->withInput()->withErrors(['venue_id' => 'Pilih venue untuk lapangan ini.']);
+        }
+
+        $data = $this->applyCourtRelations($request, $data, $venue);
+
+        $gallery = collect(is_array($lapangan->foto_gallery) ? $lapangan->foto_gallery : [])
+            ->filter()
+            ->values()
+            ->all();
+
+        foreach (($request->input('remove_gallery', []) ?: []) as $path) {
+            $this->deletePublicUpload($path);
+            $gallery = array_values(array_filter($gallery, fn ($item) => $item !== $path));
+        }
+
+        $coverPhoto = trim((string) $request->input('cover_photo', ''));
+        if ($coverPhoto !== '' && in_array($coverPhoto, $gallery, true)) {
+            if ($lapangan->foto && $lapangan->foto !== $coverPhoto) {
+                $gallery[] = $lapangan->foto;
+            }
+
+            $data['foto'] = $coverPhoto;
+            $gallery = array_values(array_filter($gallery, fn ($item) => $item !== $coverPhoto));
+        }
 
         if ($request->hasFile('foto')) {
-            $this->deletePublicUpload($lapangan->foto);
+            if ($lapangan->foto) {
+                $gallery[] = $lapangan->foto;
+            }
+
             $data['foto'] = $this->publicUpload($request, 'foto', 'courts');
         }
 
-        $existingGallery = $lapangan->foto_gallery ?? [];
         $newGallery = $this->publicUploadMultiple($request, 'foto_gallery', 'courts');
-        $data['foto_gallery'] = array_values(array_filter(array_merge($existingGallery, $newGallery)));
-        $data['fasilitas'] = $this->normalizeFacilities($request->input('fasilitas', []));
-        if (!in_array($data['status'], ['Perawatan', 'Perbaikan'], true)) {
-            $data['maintenance_note'] = null;
+        $data['foto_gallery'] = array_values(array_unique(array_filter(array_merge($gallery, $newGallery))));
+        $data['court_facilities'] = $this->normalizeFacilities($request->input('court_facilities', []));
+        $data['status'] = $data['operational_status'] === 'Beroperasi'
+            ? 'Tersedia'
+            : $data['operational_status'];
+
+        foreach ([
+            'price_labels', 'price_day_types', 'price_days',
+            'price_start_times', 'price_end_times', 'price_prices',
+            'remove_gallery', 'cover_photo',
+        ] as $key) {
+            unset($data[$key]);
+        }
+
+        $lapangan->update($data);
+        $this->syncCourtPriceRules($lapangan, $request);
+
+        return redirect()->route('admin.courts')->with('success', 'Lapangan berhasil diperbarui.');
+    }
+
+    private function validateCourtPayload(Request $request): array
+    {
+        return $request->validate([
+            'nama' => ['required', 'string', 'max:255'],
+            'jenis' => ['required', 'in:Futsal,Badminton'],
+            'lokasi' => ['nullable', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'harga' => ['required', 'numeric', 'min:0'],
+            'operational_status' => ['required', 'in:Beroperasi,Perawatan,Perbaikan,Tidak Aktif'],
+            'maintenance_note' => ['nullable', 'string', 'max:1000'],
+            'deskripsi' => ['nullable', 'string', 'max:3000'],
+            'use_venue_location' => ['nullable', 'boolean'],
+            'area_type' => ['nullable', 'in:Indoor,Outdoor'],
+            'floor_type' => ['nullable', 'string', 'max:80'],
+            'court_facilities' => ['nullable', 'array', 'max:30'],
+            'court_facilities.*' => ['nullable', 'string', 'max:80'],
+            'foto' => ['nullable', 'image', 'max:4096'],
+            'foto_gallery' => ['nullable', 'array', 'max:20'],
+            'foto_gallery.*' => ['image', 'max:4096'],
+            'remove_gallery' => ['nullable', 'array'],
+            'remove_gallery.*' => ['string', 'max:500'],
+            'cover_photo' => ['nullable', 'string', 'max:500'],
+            'owner_admin_id' => ['nullable', 'exists:users,id'],
+            'venue_id' => ['nullable', 'exists:venues,id'],
+            'price_labels' => ['nullable', 'array'],
+            'price_labels.*' => ['nullable', 'string', 'max:80'],
+            'price_day_types' => ['nullable', 'array'],
+            'price_day_types.*' => ['nullable', 'in:weekday,weekend,custom'],
+            'price_days' => ['nullable', 'array'],
+            'price_days.*' => ['nullable', 'array'],
+            'price_days.*.*' => ['nullable', 'in:Senin,Selasa,Rabu,Kamis,Jumat,Sabtu,Minggu'],
+            'price_start_times' => ['nullable', 'array'],
+            'price_start_times.*' => ['nullable', 'date_format:H:i'],
+            'price_end_times' => ['nullable', 'array'],
+            'price_end_times.*' => ['nullable', 'date_format:H:i'],
+            'price_prices' => ['nullable', 'array'],
+            'price_prices.*' => ['nullable', 'numeric', 'min:0'],
+        ]);
+    }
+
+    private function resolveCourtVenue(Request $request, ?int $venueId): ?Venue
+    {
+        if ($venueId) {
+            $query = Venue::query();
+
+            if (!$this->isSuperadmin($request)) {
+                $query->where('owner_admin_id', $request->session()->get('admin_user_id'));
+            }
+
+            return $query->findOrFail($venueId);
         }
 
         if ($request->session()->get('admin_role') === 'venue_admin') {
-            $venue = Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->findOrFail($data['venue_id'] ?? null);
-            $data['owner_admin_id'] = $venue->owner_admin_id;
-            $data['venue_id'] = $venue->id;
-        } elseif (! $this->isSuperadmin($request)) {
-            // Admin biasa: pertahankan owner_admin_id & venue_id yang sudah ada
-            $data['owner_admin_id'] = $lapangan->owner_admin_id;
-            $data['venue_id'] = $lapangan->venue_id;
+            return Venue::where('owner_admin_id', $request->session()->get('admin_user_id'))->first();
         }
-        if ($this->isSuperadmin($request) && $request->filled('owner_admin_id')) {
-            $ownerId = $request->input('owner_admin_id');
-            if ($ownerId && ! User::where('id', $ownerId)->whereIn('role', ['admin','venue_admin'])->exists()) {
-                return back()->withInput()->withErrors(['owner_admin_id' => 'Pemilik venue harus akun admin venue aktif.']);
+
+        return null;
+    }
+
+    private function applyCourtRelations(Request $request, array $data, ?Venue $venue): array
+    {
+        $useVenueLocation = $request->boolean('use_venue_location');
+
+        if (!$venue) {
+            $useVenueLocation = false;
+        }
+
+        if ($useVenueLocation && $venue) {
+            $data['lokasi'] = $venue->address ?: ($venue->name ?? '');
+            $data['latitude'] = $venue->latitude;
+            $data['longitude'] = $venue->longitude;
+            $data['use_venue_location'] = true;
+        } else {
+            $data['use_venue_location'] = false;
+
+            if (blank($data['lokasi'] ?? null)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'lokasi' => 'Alamat lapangan wajib diisi jika memakai lokasi khusus.',
+                ]);
             }
-            $data['owner_admin_id'] = $ownerId;
-            $data['venue_id'] = $ownerId ? Venue::where('owner_admin_id', $ownerId)->value('id') : null;
         }
-        $lapangan->update($data);
-        return redirect()->route('admin.courts')->with('success', 'Lapangan berhasil diperbarui.');
+
+        if ($this->isSuperadmin($request)) {
+            $data['owner_admin_id'] = $request->input('owner_admin_id')
+                ?: $venue?->owner_admin_id;
+        } else {
+            $data['owner_admin_id'] = $request->session()->get('admin_user_id');
+        }
+
+        $data['venue_id'] = $venue?->id;
+
+        if (!in_array($data['operational_status'], ['Perawatan', 'Perbaikan'], true)) {
+            $data['maintenance_note'] = null;
+        }
+
+        return $data;
+    }
+
+    private function syncCourtPriceRules(Lapangan $lapangan, Request $request): void
+    {
+        $lapangan->priceRules()->delete();
+
+        $prices = $request->input('price_prices', []) ?: [];
+        $starts = $request->input('price_start_times', []) ?: [];
+        $ends = $request->input('price_end_times', []) ?: [];
+        $labels = $request->input('price_labels', []) ?: [];
+        $dayTypes = $request->input('price_day_types', []) ?: [];
+        $days = $request->input('price_days', []) ?: [];
+
+        foreach ($prices as $index => $price) {
+            if ($price === null || $price === '') {
+                continue;
+            }
+
+            $start = $starts[$index] ?? null;
+            $end = $ends[$index] ?? null;
+
+            if (!$start || !$end) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'price_start_times' => 'Jam mulai dan jam selesai aturan harga wajib diisi.',
+                ]);
+            }
+
+            $dayType = $dayTypes[$index] ?? 'weekday';
+            $ruleDays = array_values(array_filter($days[$index] ?? []));
+
+            if ($dayType === 'custom' && $ruleDays === []) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'price_days' => 'Pilih hari untuk aturan harga khusus.',
+                ]);
+            }
+
+            $lapangan->priceRules()->create([
+                'label' => trim((string) ($labels[$index] ?? '')) ?: null,
+                'day_type' => $dayType,
+                'days' => $dayType === 'custom' ? $ruleDays : null,
+                'start_time' => $start,
+                'end_time' => $end,
+                'price' => (int) $price,
+                'priority' => (int) $index,
+            ]);
+        }
     }
 
     public function courtDelete(Request $request, Lapangan $lapangan): RedirectResponse
@@ -691,7 +843,8 @@ class AdminController extends Controller
         if ($overlap) {
             return back()->withInput()->withErrors(['start_time' => 'Jadwal lapangan bentrok dengan booking yang sudah ada.']);
         }
-        $data['total_price'] = $court->harga * (int) $data['hours'];
+        $data['total_price'] = app(\App\Services\CourtPricingService::class)
+            ->quote($court, $data['booking_date'], $data['start_time'], (int) $data['hours'])['total'];
         $data['payment_method'] = 'Midtrans';
         $data['status'] = $data['status'] === 'Dibatalkan' ? 'Dibatalkan' : 'Menunggu';
         $booking = Booking::create($data);
@@ -988,13 +1141,15 @@ class AdminController extends Controller
             'description' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', 'in:Aktif,Nonaktif'],
             'venue_id' => ['nullable', 'integer', 'exists:venues,id'],
-            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
         ], [
             'title.required' => 'Judul reward wajib diisi.',
             'points_required.required' => 'Poin reward wajib diisi.',
             'points_required.integer' => 'Poin reward harus berupa angka bulat.',
             'status.in' => 'Status reward harus Aktif atau Nonaktif.',
-            'image.image' => 'File reward harus berupa gambar.',
+            'image.image' => 'File reward harus berupa gambar valid.',
+            'image.mimes' => 'Format gambar reward harus JPG, JPEG, PNG, WEBP, atau SVG.',
+            'image.max' => 'Ukuran gambar reward maksimal 5 MB.',
         ]);
 
         $isSuperadmin = $this->isSuperadmin($request);
@@ -1003,7 +1158,7 @@ class AdminController extends Controller
 
         if ($venueId) {
             $venue = Venue::find($venueId);
-            abort_unless($venue && ($isSuperadmin || (int) $venue->owner_admin_id === $adminId), 403);
+            abort_unless($venue && ($isSuperadmin || (int) $venue->owner_admin_id === $adminId), 403, 'Anda tidak memiliki akses ke venue yang dipilih.');
         }
 
         $data['owner_admin_id'] = $isSuperadmin ? ($venueId ? (Venue::find($venueId)?->owner_admin_id) : $adminId) : $adminId;
@@ -1037,13 +1192,15 @@ class AdminController extends Controller
             'description' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', 'in:Aktif,Nonaktif'],
             'venue_id' => ['nullable', 'integer', 'exists:venues,id'],
-            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:4096'],
+            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:5120'],
         ], [
             'title.required' => 'Judul reward wajib diisi.',
             'points_required.required' => 'Poin reward wajib diisi.',
             'points_required.integer' => 'Poin reward harus berupa angka bulat.',
             'status.in' => 'Status reward harus Aktif atau Nonaktif.',
-            'image.image' => 'File reward harus berupa gambar.',
+            'image.image' => 'File reward harus berupa gambar valid.',
+            'image.mimes' => 'Format gambar reward harus JPG, JPEG, PNG, WEBP, atau SVG.',
+            'image.max' => 'Ukuran gambar reward maksimal 5 MB.',
         ]);
 
         $isSuperadmin = $this->isSuperadmin($request);
@@ -1052,7 +1209,7 @@ class AdminController extends Controller
 
         if ($venueId) {
             $venue = Venue::find($venueId);
-            abort_unless($venue && ($isSuperadmin || (int) $venue->owner_admin_id === $adminId), 403);
+            abort_unless($venue && ($isSuperadmin || (int) $venue->owner_admin_id === $adminId), 403, 'Anda tidak memiliki akses ke venue yang dipilih.');
         }
 
         $data['venue_id'] = $venueId ?: null;
@@ -1398,7 +1555,9 @@ class AdminController extends Controller
         }
 
         $lapangan = $booking->lapangan;
-        $amount = $data['payment_type'] === 'Gratis' ? 0 : (int) ($lapangan->harga * (int) $data['hours']);
+        $extensionTotal = app(\App\Services\CourtPricingService::class)
+            ->quote($lapangan, $bookingDate, $previousEnd, (int) $data['hours'])['total'];
+        $amount = $data['payment_type'] === 'Gratis' ? 0 : $extensionTotal;
         $status = 'Lunas';
 
         DB::transaction(function () use ($booking, $data, $previousEnd, $newEnd, $amount, $status, $request) {

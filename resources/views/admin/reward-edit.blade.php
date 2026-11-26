@@ -56,17 +56,18 @@
 
     <div class="form-group preview-shell {{ $reward->image ? 'has-image' : '' }}">
         <label>Foto Saat Ini</label>
-        @if($reward->image)
-            <img id="reward-preview-image" class="preview-img" src="{{ asset($reward->image) }}" alt="{{ $reward->title }}">
+        @if($reward->image && file_exists(public_path($reward->image)))
+            <img id="reward-preview-image" class="preview-img" style="max-height:180px; object-fit:contain;" src="{{ asset($reward->image) }}" alt="{{ $reward->title }}">
         @else
             <div id="reward-preview-placeholder" class="reward-banner">{{ $reward->badge ?: 'Reward' }}</div>
-            <img id="reward-preview-image" class="preview-img" style="display:none" alt="Preview Reward">
+            <img id="reward-preview-image" class="preview-img" style="display:none; max-height:180px; object-fit:contain;" alt="Preview Reward">
         @endif
     </div>
 
     <div class="form-group">
         <label>Ganti Foto Reward</label>
-        <input class="input-ui" type="file" accept="image/*" name="image" data-preview="reward-preview-image">
+        <input class="input-ui" type="file" accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml" name="image" data-preview="reward-preview-image">
+        <small class="muted">Format: JPG, PNG, WEBP, atau SVG (Maks. 5 MB). Biarkan kosong jika tidak ingin mengubah foto.</small>
     </div>
 
     <div class="form-actions-right">

@@ -13,7 +13,7 @@ class CatalogController extends BaseApiController
     public function venues(Request $request)
     {
         $query = Venue::withCount([
-            'lapangans' => fn ($q) => $q->where('status', 'Tersedia'),
+            'lapangans' => fn ($q) => $q->operational(),
         ])->where('status', 'Aktif');
 
         if ($request->filled('q')) {
@@ -59,12 +59,7 @@ class CatalogController extends BaseApiController
 
     public function courts(Request $request)
     {
-        $query = Lapangan::with('venue')
-            ->where('status', 'Tersedia')
-            ->where(function ($venueQuery) {
-                $venueQuery->whereNull('venue_id')
-                    ->orWhereHas('venue', fn ($venue) => $venue->where('status', 'Aktif'));
-            });
+        $query = Lapangan::with(['venue', 'priceRules'])->bookable();
 
         if ($request->filled('q')) {
             $term = trim((string) $request->query('q'));
@@ -104,8 +99,7 @@ class CatalogController extends BaseApiController
         $lapangan->loadMissing('venue');
 
         abort_unless(
-            $lapangan->status === 'Tersedia'
-                && (! $lapangan->venue_id || $lapangan->venue?->status === 'Aktif'),
+            !$lapangan->venue_id || $lapangan->venue?->status === 'Aktif',
             404,
             'Lapangan tidak tersedia.'
         );
@@ -120,6 +114,8 @@ class CatalogController extends BaseApiController
 
     public function availability(Request $request, Lapangan $lapangan)
     {
+        $lapangan->loadMissing(['venue', 'priceRules']);
+
         $data = $request->validate([
             'date' => ['required', 'date', 'after_or_equal:today'],
         ]);
@@ -156,12 +152,21 @@ class CatalogController extends BaseApiController
             ];
         }
 
-        $opening = '07:00';
-        $closing = '23:00';
+        $opening = $lapangan->venue?->opening_time
+            ? substr((string) $lapangan->venue->opening_time, 0, 5)
+            : '07:00';
+        $closing = $lapangan->venue?->closing_time
+            ? substr((string) $lapangan->venue->closing_time, 0, 5)
+            : '23:00';
+        $pricing = app(\App\Services\CourtPricingService::class);
         $slots = [];
 
         $cursor = strtotime('today '.$opening);
         $closingTimestamp = strtotime('today '.$closing);
+
+        if ($closingTimestamp <= $cursor) {
+            $closingTimestamp += 24 * 3600;
+        }
 
         while ($cursor < $closingTimestamp) {
             $slotStart = date('H:i', $cursor);
@@ -179,6 +184,7 @@ class CatalogController extends BaseApiController
                 'start_time' => $slotStart,
                 'end_time' => $slotEnd,
                 'available' => ! $isBooked,
+                'price' => $pricing->quote($lapangan, $date, $slotStart, 1)['total'],
             ];
 
             $cursor += 3600;
@@ -188,9 +194,11 @@ class CatalogController extends BaseApiController
             'date' => $date,
             'opening' => $opening,
             'closing' => $closing,
+            'operational_status' => $lapangan->operational_status ?: 'Beroperasi',
+            'is_operating_day' => $pricing->isOperatingDay($lapangan->venue, $date),
             'booked' => $booked,
             'slots' => $slots,
-            'price' => (int) $lapangan->harga,
+            'price' => $pricing->minimumPrice($lapangan),
         ]);
     }
 }

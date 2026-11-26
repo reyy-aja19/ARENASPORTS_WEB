@@ -117,18 +117,18 @@ class BaseApiController extends Controller
 
         if ($withCourts) {
             $courts = $venue->lapangans()
-                ->where('status', 'Tersedia')
+                ->operational()
                 ->latest()
                 ->get();
         }
 
         $courtStats = $venue->lapangans()
-            ->where('status', 'Tersedia')
+            ->operational()
             ->selectRaw('COUNT(*) as total, MIN(harga) as min_price, AVG(rating) as rating')
             ->first();
 
         $availableCourtIds = $venue->lapangans()
-            ->where('status', 'Tersedia')
+            ->operational()
             ->select('id');
 
         $reviewStats = \App\Models\Review::whereIn('lapangan_id', $availableCourtIds)
@@ -152,11 +152,23 @@ class BaseApiController extends Controller
             'contact_phone' => $venue->contact_phone,
             'description' => $venue->description,
             'photo_url' => $venue->photo_url,
-            'gallery' => $venue->gallery_urls,
+            'gallery' => $venue->photo_gallery_urls,
             'sports' => $venue->sports ?? [],
             'facilities' => $venue->facilities ?? [],
             'status' => $venue->status,
-            'operating_hours' => $venue->operating_hours,
+            'operational_status' => $venue->operational_status,
+            'managed_by' => $venue->managed_by,
+            'entity_type' => $venue->entity_type,
+            'company' => $venue->company_information_available ? [
+                'name' => $venue->company_name,
+                'type' => $venue->business_type,
+                'nib' => $venue->nib,
+                'address' => $venue->company_address,
+                'phone' => $venue->company_phone,
+                'description' => $venue->company_description,
+            ] : null,
+            'operating_hours' => $venue->operating_hours_text,
+            'operating_days' => $venue->operating_days_list,
             'google_maps_url' => $venue->google_maps_url,
             'latitude' => $venueLat,
             'longitude' => $venueLng,
@@ -191,14 +203,28 @@ class BaseApiController extends Controller
             'id' => (int) $court->id,
             'name' => $court->nama,
             'type' => $court->jenis,
-            'location' => $court->lokasi ?: $court->venue?->address,
+            'location' => $court->display_location ?: $court->venue?->address,
             'price' => (int) $court->harga,
+            'min_price' => $court->min_price,
             'rating' => (float) $court->rating,
             'status' => $court->status,
+            'operational_status' => $court->operational_status ?: 'Beroperasi',
+            'is_bookable' => $court->is_bookable,
             'description' => $court->deskripsi,
             'image_url' => $court->foto_url,
-            'gallery_images' => $this->imageList($court->foto_gallery),
+            'gallery_images' => $court->gallery_urls,
             'facilities' => $court->fasilitas ?? [],
+            'court_facilities' => $court->court_facilities_list,
+            'area_type' => $court->area_type,
+            'floor_type' => $court->floor_type,
+            'price_rules' => $court->priceRules->map(fn ($rule) => [
+                'label' => $rule->label,
+                'day_type' => $rule->day_type,
+                'days' => $rule->days,
+                'start_time' => substr((string) $rule->start_time, 0, 5),
+                'end_time' => substr((string) $rule->end_time, 0, 5),
+                'price' => (int) $rule->price,
+            ])->values()->all(),
             'latitude' => $latitude,
             'longitude' => $longitude,
             'venue_id' => $court->venue_id ? (int) $court->venue_id : null,

@@ -121,6 +121,7 @@
                 <div class="va-card-body">
                     <p class="va-section-label">Informasi pemohon & perusahaan</p>
                     <div class="va-data-grid">
+                        <div class="va-data"><small>Jenis usaha</small><strong>{{ $app->entity_type ?: ($app->business_type === 'Perorangan' ? 'Perorangan' : 'Badan Usaha') }}</strong></div>
                         <div class="va-data"><small>Perusahaan / badan usaha</small><strong>{{ $app->company_name ?: '-' }}</strong><br><span>{{ $app->business_type ?: '-' }}</span></div>
                         <div class="va-data"><small>NIB</small><strong>{{ $app->nib ?: '-' }}</strong></div>
                         <div class="va-data"><small>Nomor identitas pemilik</small><strong>{{ $app->identity_number ?: '-' }}</strong></div>
@@ -137,7 +138,8 @@
                     <div class="va-data-grid">
                         <div class="va-data"><small>Alamat venue</small><span>{{ $app->address ?: '-' }}</span></div>
                         <div class="va-data"><small>Kontak venue</small><strong>{{ $app->contact_phone ?: '-' }}</strong></div>
-                        <div class="va-data"><small>Jam operasional</small><strong>{{ $app->operating_hours ?: '-' }}</strong></div>
+                        <div class="va-data"><small>Jam operasional</small><strong>{{ $app->opening_time && $app->closing_time ? substr((string) $app->opening_time, 0, 5) . ' – ' . substr((string) $app->closing_time, 0, 5) : ($app->operating_hours ?: '-') }}</strong></div>
+                        <div class="va-data"><small>Hari operasional</small><span>{{ is_array($app->operating_days) && count($app->operating_days) ? implode(', ', $app->operating_days) : 'Setiap hari' }}</span></div>
                         <div class="va-data"><small>Jenis olahraga</small><span>{{ count($sports) ? implode(', ', $sports) : '-' }}</span></div>
                         <div class="va-data"><small>Lokasi Google Maps</small>
                             @if($app->google_maps_url)

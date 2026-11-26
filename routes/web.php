@@ -393,6 +393,11 @@ Route::middleware([CekLogin::class, 'role:user'])
             'profileUpdate'
         ])->name('profile.update');
 
+        Route::put('/profil/password', [
+            UserController::class,
+            'passwordUpdate'
+        ])->name('profile.password');
+
         Route::get('/api/notifications', [
             UserNotificationController::class,
             'apiNotifications'
