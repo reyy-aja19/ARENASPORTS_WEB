@@ -586,7 +586,6 @@ class MidtransController extends Controller
 
         if (
             $orderId === ''
-            || $midtransTransactionId === ''
             || $statusCode === ''
             || $grossAmount === ''
             || $signature === ''
@@ -612,15 +611,18 @@ class MidtransController extends Controller
         }
 
         if (!$this->locatePayment($orderId, $midtransTransactionId)) {
-            Log::warning('Order ID Midtrans tidak ditemukan.', [
+            // Notifikasi untuk order yang tidak ada di database (misalnya
+            // test notification dari dashboard Midtrans). Tetap balas 2xx
+            // agar Midtrans tidak menganggap endpoint gagal dan retry terus.
+            Log::warning('Order ID Midtrans tidak ditemukan. Notifikasi diabaikan.', [
                 'order_id' => $orderId,
                 'transaction_id' => $midtransTransactionId,
             ]);
 
             return response()->json([
-                'ok' => false,
-                'message' => 'Pembayaran lokal tidak ditemukan.',
-            ], 500);
+                'ok' => true,
+                'message' => 'Pembayaran lokal tidak ditemukan; notifikasi diabaikan.',
+            ]);
         }
 
         try {
